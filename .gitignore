@@ -12,3 +12,6 @@ out/
 # misc
 .DS_Store
 *.log
+
+# local-only docs (demo credentials)
+*.local.md

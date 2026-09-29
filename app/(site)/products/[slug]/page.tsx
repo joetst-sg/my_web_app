@@ -1,0 +1,158 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { notFound } from 'next/navigation'
+import { ChevronRight } from 'lucide-react'
+import { SectionHeader } from '@/components/common/basics'
+import { CollectionCard } from '@/components/common/cards'
+import { TrackOnMount } from '@/components/common/track'
+import { ProductDetailView } from '@/components/product/product-detail-view'
+import { ProductGrid } from '@/components/product/product-grid'
+import { getViewer } from '@/lib/auth'
+import { collectionsContainingProduct } from '@/lib/db/content'
+import { toProductView } from '@/lib/db/product-view'
+import { getProductBySlug, productsByIds } from '@/lib/db/products'
+import { productImageUrl } from '@/lib/images'
+import { site } from '@/lib/site'
+import { createClient } from '@/lib/supabase/server'
+
+export async function generateMetadata({ params }: PageProps<'/products/[slug]'>): Promise<Metadata> {
+  const { slug } = await params
+  const p = await getProductBySlug(slug)
+  if (!p || p.status !== 'published') return { title: 'Product not found', robots: { index: false } }
+  const title = p.seo_title || `${p.name}${p.brand ? ` by ${p.brand.name}` : ''}`
+  const description = p.seo_description || p.tagline || undefined
+  const image = productImageUrl(p.images[0]?.storage_path)
+  return {
+    title,
+    description,
+    alternates: { canonical: `/products/${p.slug}` },
+    openGraph: {
+      type: 'website',
+      title,
+      description,
+      url: `/products/${p.slug}`,
+      images: image ? [{ url: image, width: 1200, height: 900, alt: p.name }] : undefined,
+    },
+    twitter: { card: 'summary_large_image', title, description, images: image ? [image] : undefined },
+  }
+}
+
+export default async function ProductPage({ params }: PageProps<'/products/[slug]'>) {
+  const { slug } = await params
+  const product = await getProductBySlug(slug)
+  // Unpublished products are visible only to their seller and staff (RLS);
+  // they get a notice so it's clear the public can't see them yet.
+  if (!product) notFound()
+
+  const view = toProductView(product)
+  const viewer = await getViewer()
+  const supabase = await createClient()
+
+  const [{ data: related }, collections, viewerState] = await Promise.all([
+    supabase.rpc('related_products', { _product_id: product.id, result_limit: 8 }),
+    collectionsContainingProduct(product.id),
+    viewer
+      ? Promise.all([
+          supabase.from('product_saves').select('product_id').eq('user_id', viewer.id).eq('product_id', product.id).maybeSingle(),
+          supabase.from('reminders').select('id').eq('user_id', viewer.id).eq('product_id', product.id).eq('status', 'pending').limit(1),
+          product.brand
+            ? supabase.from('brand_followers').select('brand_id').eq('user_id', viewer.id).eq('brand_id', product.brand.id).maybeSingle()
+            : Promise.resolve({ data: null }),
+        ]).then(([s, r, f]) => ({ saved: Boolean(s.data), reminded: (r.data ?? []).length > 0, followsBrand: Boolean(f.data) }))
+      : Promise.resolve(undefined),
+  ])
+  const relatedCards = await productsByIds((related ?? []).map((r) => r.product_id))
+
+  const url = `${site.url}/products/${product.slug}`
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: product.name,
+      description: product.tagline ?? undefined,
+      image: view.images.map((i) => i.src),
+      sku: product.sku ?? undefined,
+      brand: product.brand ? { '@type': 'Brand', name: product.brand.name } : undefined,
+      category: view.category?.name,
+      url,
+      offers:
+        view.price !== null && product.external_url
+          ? {
+              '@type': 'Offer',
+              price: view.price,
+              priceCurrency: view.currency,
+              url: product.external_url,
+              availability:
+                product.availability === 'sold_out' ? 'https://schema.org/SoldOut'
+                : product.availability === 'preorder' ? 'https://schema.org/PreOrder'
+                : product.availability === 'discontinued' ? 'https://schema.org/Discontinued'
+                : 'https://schema.org/InStock',
+            }
+          : undefined,
+      review: view.score
+        ? {
+            '@type': 'Review',
+            author: { '@type': 'Organization', name: site.name },
+            reviewRating: { '@type': 'Rating', ratingValue: view.score.overall, bestRating: 10, worstRating: 0 },
+          }
+        : undefined,
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: site.url },
+        ...(view.category ? [{ '@type': 'ListItem', position: 2, name: view.category.name, item: `${site.url}/categories/${view.category.slug}` }] : []),
+        { '@type': 'ListItem', position: view.category ? 3 : 2, name: product.name, item: url },
+      ],
+    },
+  ]
+
+  return (
+    <div className="container-page py-6 sm:py-10">
+      {product.status === 'published' ? (
+        <>
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }} />
+          <TrackOnMount event={{ event: 'product_view', productId: product.id }} />
+        </>
+      ) : (
+        <div role="status" className="mb-6 rounded-xl border border-warning/40 bg-[oklch(0.97_0.04_80)] px-4 py-3 text-sm">
+          This product is <strong>{product.status.replace('_', ' ')}</strong> and is not visible to the public. You can see it because you are its seller or an editor.
+        </div>
+      )}
+      <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted-foreground">
+        <ol className="flex flex-wrap items-center gap-1">
+          <li><Link href="/" className="hover:text-foreground">Home</Link></li>
+          {view.category && (
+            <li className="flex items-center gap-1">
+              <ChevronRight className="size-3.5" aria-hidden />
+              <Link href={`/categories/${view.category.slug}`} className="hover:text-foreground">{view.category.name}</Link>
+            </li>
+          )}
+          <li className="flex items-center gap-1">
+            <ChevronRight className="size-3.5" aria-hidden />
+            <span aria-current="page" className="text-foreground">{product.name}</span>
+          </li>
+        </ol>
+      </nav>
+
+      <ProductDetailView product={view} shareUrl={url} viewer={viewerState} />
+
+      {relatedCards.length > 0 && (
+        <section className="mt-20">
+          <SectionHeader title="Related products" subtitle="Same category, brand, tags or price range." />
+          <ProductGrid products={relatedCards.slice(0, 8)} />
+        </section>
+      )}
+
+      {collections.length > 0 && (
+        <section className="mt-20">
+          <SectionHeader title="In these collections" />
+          <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+            {collections.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
+          </div>
+        </section>
+      )}
+    </div>
+  )
+}

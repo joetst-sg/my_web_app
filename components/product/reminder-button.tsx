@@ -1,0 +1,137 @@
+'use client'
+
+import { useState, useTransition } from 'react'
+import { BellPlus, BellRing } from 'lucide-react'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { LoginPrompt } from '@/components/common/login-prompt'
+import { createReminder } from '@/lib/actions/engagement'
+import { LOGIN_REQUIRED } from '@/lib/errors'
+
+type ReminderType = 'launch' | 'sale' | 'custom'
+
+export function ReminderButton({
+  productId,
+  productName,
+  availability,
+  initialSet = false,
+  variant = 'icon',
+  className,
+}: {
+  productId: string
+  productName: string
+  availability?: string | null
+  initialSet?: boolean
+  variant?: 'icon' | 'full'
+  className?: string
+}) {
+  const upcoming = availability === 'coming_soon' || availability === 'crowdfunding' || availability === 'preorder'
+  const [open, setOpen] = useState(false)
+  const [loginOpen, setLoginOpen] = useState(false)
+  const [isSet, setIsSet] = useState(initialSet)
+  const [type, setType] = useState<ReminderType>(upcoming ? 'launch' : 'sale')
+  const [date, setDate] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+
+  function submit() {
+    setError(null)
+    startTransition(async () => {
+      const res = await createReminder({
+        productId,
+        type,
+        remindAt: type === 'custom' && date ? new Date(date).toISOString() : undefined,
+      })
+      if (!res.ok) {
+        if (res.error === LOGIN_REQUIRED) {
+          setOpen(false)
+          setLoginOpen(true)
+        } else setError(res.error)
+        return
+      }
+      setIsSet(true)
+      setOpen(false)
+      toast.success(res.message ?? 'Reminder set')
+    })
+  }
+
+  const minDate = new Date(Date.now() + 60 * 60 * 1000).toISOString().slice(0, 16)
+  const Icon = isSet ? BellRing : BellPlus
+
+  return (
+    <>
+      {variant === 'icon' ? (
+        <Button
+          type="button"
+          size="icon-lg"
+          variant="secondary"
+          aria-label={`Set a reminder for ${productName}`}
+          title={isSet ? 'Reminder set' : 'Remind me'}
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            setOpen(true)
+          }}
+          className={cn('rounded-full bg-background/90 shadow-sm backdrop-blur hover:bg-background', className)}
+        >
+          <Icon className={cn('size-4', isSet && 'text-highlight-foreground')} />
+        </Button>
+      ) : (
+        <Button type="button" size="lg" variant="outline" onClick={() => setOpen(true)} className={className}>
+          <Icon />
+          {isSet ? 'Reminder set' : 'Remind me'}
+        </Button>
+      )}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle>Remind me about {productName}</DialogTitle>
+            <DialogDescription>We&apos;ll send a notification{' '}and an email if you have email updates turned on.</DialogDescription>
+          </DialogHeader>
+          <RadioGroup value={type} onValueChange={(v) => setType(v as ReminderType)} className="gap-3">
+            <label className="flex items-start gap-3 rounded-lg border p-3 has-[[data-state=checked]]:border-foreground">
+              <RadioGroupItem value="launch" id={`r-launch-${productId}`} className="mt-0.5" />
+              <span>
+                <span className="block text-sm font-medium">When it launches</span>
+                <span className="block text-xs text-muted-foreground">For pre-orders, crowdfunding and coming-soon products.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border p-3 has-[[data-state=checked]]:border-foreground">
+              <RadioGroupItem value="sale" id={`r-sale-${productId}`} className="mt-0.5" />
+              <span>
+                <span className="block text-sm font-medium">When it goes on sale</span>
+                <span className="block text-xs text-muted-foreground">We&apos;ll tell you when there&apos;s a deal or a discount.</span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 rounded-lg border p-3 has-[[data-state=checked]]:border-foreground">
+              <RadioGroupItem value="custom" id={`r-custom-${productId}`} className="mt-0.5" />
+              <span className="flex-1">
+                <span className="block text-sm font-medium">On a date I choose</span>
+                {type === 'custom' && (
+                  <span className="mt-2 block">
+                    <Label htmlFor={`r-date-${productId}`} className="sr-only">Reminder date and time</Label>
+                    <Input id={`r-date-${productId}`} type="datetime-local" min={minDate} value={date} onChange={(e) => setDate(e.target.value)} />
+                  </span>
+                )}
+              </span>
+            </label>
+          </RadioGroup>
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button variant="outline" size="lg" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button size="lg" onClick={submit} disabled={pending || (type === 'custom' && !date)}>
+              {pending ? 'Setting…' : 'Set reminder'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <LoginPrompt open={loginOpen} onOpenChange={setLoginOpen} reason="get reminders about launches and sales" />
+    </>
+  )
+}
