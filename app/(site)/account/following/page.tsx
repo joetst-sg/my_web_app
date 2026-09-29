@@ -1,0 +1,69 @@
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import { Heart } from 'lucide-react'
+import { BrandMark, EmptyState } from '@/components/common/basics'
+import { FollowButton } from '@/components/common/follow-button'
+import { requireViewer } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
+
+export const metadata: Metadata = { title: 'Following', robots: { index: false } }
+
+export default async function FollowingPage() {
+  const viewer = await requireViewer('/account/following')
+  const supabase = await createClient()
+  const [{ data: brands }, { data: cats }, { data: cols }] = await Promise.all([
+    supabase.from('brand_followers').select('brand:brands ( id, slug, name, logo_url, tagline )').eq('user_id', viewer.id),
+    supabase.from('category_followers').select('category:categories ( id, slug, name )').eq('user_id', viewer.id),
+    supabase.from('collection_followers').select('collection:collections ( id, slug, title, product_count )').eq('user_id', viewer.id),
+  ])
+  const empty = !brands?.length && !cats?.length && !cols?.length
+
+  return (
+    <div>
+      <h1 className="font-display text-3xl font-bold sm:text-4xl">Following</h1>
+      <p className="mb-8 mt-1 text-muted-foreground">Brands, categories and collections you follow shape your feed.</p>
+      {empty ? (
+        <EmptyState icon={Heart} title="You're not following anything yet" description="Follow a brand or category to see its new products in your feed." />
+      ) : (
+        <div className="flex flex-col gap-10">
+          <section>
+            <h2 className="mb-3 font-sans text-lg font-semibold tracking-normal">Brands ({brands?.length ?? 0})</h2>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {(brands ?? []).map(({ brand: b }) => b && (
+                <li key={b.id} className="flex items-center gap-3 rounded-2xl border p-3">
+                  <BrandMark name={b.name} logoUrl={b.logo_url} size={40} />
+                  <Link href={`/brands/${b.slug}`} className="min-w-0 flex-1 truncate font-medium hover:underline">{b.name}</Link>
+                  <FollowButton kind="brand" id={b.id} name={b.name} initialFollowing size="sm" />
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section>
+            <h2 className="mb-3 font-sans text-lg font-semibold tracking-normal">Categories ({cats?.length ?? 0})</h2>
+            <ul className="grid gap-3 sm:grid-cols-2">
+              {(cats ?? []).map(({ category: c }) => c && (
+                <li key={c.id} className="flex items-center gap-3 rounded-2xl border p-3">
+                  <Link href={`/categories/${c.slug}`} className="min-w-0 flex-1 truncate font-medium hover:underline">{c.name}</Link>
+                  <FollowButton kind="category" id={c.id} name={c.name} initialFollowing size="sm" />
+                </li>
+              ))}
+            </ul>
+          </section>
+          {(cols ?? []).length > 0 && (
+            <section>
+              <h2 className="mb-3 font-sans text-lg font-semibold tracking-normal">Saved collections ({cols!.length})</h2>
+              <ul className="grid gap-3 sm:grid-cols-2">
+                {cols!.map(({ collection: c }) => c && (
+                  <li key={c.id} className="flex items-center gap-3 rounded-2xl border p-3">
+                    <Link href={`/collections/${c.slug}`} className="min-w-0 flex-1 truncate font-medium hover:underline">{c.title}</Link>
+                    <FollowButton kind="collection" id={c.id} name={c.title} initialFollowing size="sm" />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}

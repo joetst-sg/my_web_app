@@ -1,0 +1,7 @@
+<div style="font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;max-width:520px;margin:0 auto;padding:32px 24px;color:#1b1d24">
+  <p style="font-size:22px;font-weight:700;margin:0 0 24px">Loupe</p>
+  <h1 style="font-size:22px;margin:0 0 12px">Confirm your new email</h1>
+  <p style="font-size:15px;line-height:1.6;margin:0 0 24px">Confirm that you want to change your Loupe email from {{ .Email }} to {{ .NewEmail }}.</p>
+  <p style="margin:0 0 24px"><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email_change&next=/account/security" style="display:inline-block;background:#1b1d24;color:#fff;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600">Confirm change</a></p>
+  <p style="font-size:13px;color:#6b6f7b;line-height:1.5;margin:0">If you didn't ask for this, secure your account by resetting your password.</p>
+</div>
