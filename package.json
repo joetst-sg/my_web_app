@@ -39,6 +39,9 @@
     "build": "next build",
     "start": "next start",
     "db:seed": "node scripts/seed/index.mjs",
-    "db:types": "node scripts/gen-types.mjs"
+    "db:types": "node scripts/gen-types.mjs",
+    "test": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "typecheck": "tsc --noEmit"
   }
 }
