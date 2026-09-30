@@ -26,7 +26,8 @@ export default async function EditProductPage({ params, searchParams }: PageProp
   const product = await getEditableProduct(id)
   if (!product) notFound()
   const step = Math.min(Math.max(Number(sp.step) || 1, 1), WIZARD_STEPS.length)
-  const editable = (product.status === 'draft' || product.status === 'changes_requested') && (product.seller_id === viewer.id || viewer.isStaff)
+  // Staff can edit any product at any stage; sellers only their own drafts.
+  const editable = viewer.isStaff || ((product.status === 'draft' || product.status === 'changes_requested') && product.seller_id === viewer.id)
 
   const header = (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">

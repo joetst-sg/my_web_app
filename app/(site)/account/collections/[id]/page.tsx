@@ -17,7 +17,7 @@ export default async function EditCollectionPage({ params }: PageProps<'/account
     .select('id, slug, title, description, visibility, owner_id')
     .eq('id', id)
     .maybeSingle()
-  if (!collection || collection.owner_id !== viewer.id) notFound()
+  if (!collection || (collection.owner_id !== viewer.id && !viewer.isStaff)) notFound()
   const { data: links } = await supabase.from('collection_products').select('product_id, position').eq('collection_id', id).order('position')
   const products = await productsByIds((links ?? []).map((l) => l.product_id))
   return (
