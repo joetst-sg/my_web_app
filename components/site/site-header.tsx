@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/brand/logo'
-import { getViewer } from '@/lib/auth'
+import { getAuthUser, getViewer } from '@/lib/auth'
 import { mainNav } from '@/lib/site'
 import { createClient } from '@/lib/supabase/server'
 import { SearchBar } from './search-bar'
@@ -20,8 +20,8 @@ async function unreadCount(userId: string) {
 }
 
 export async function SiteHeader() {
-  const viewer = await getViewer()
-  const unread = viewer ? await unreadCount(viewer.id) : 0
+  const authUser = await getAuthUser()
+  const [viewer, unread] = await Promise.all([getViewer(), authUser ? unreadCount(authUser.id) : Promise.resolve(0)])
 
   return (
     <header className="sticky top-0 z-40 border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75">

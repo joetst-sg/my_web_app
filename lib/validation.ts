@@ -69,3 +69,9 @@ export function videoEmbedUrl(url: string) {
   }
   return null
 }
+
+// Only allow redirects to local paths (prevents open redirects).
+export function safeNext(next: string | null | undefined, fallback = '/') {
+  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return fallback
+  return next
+}

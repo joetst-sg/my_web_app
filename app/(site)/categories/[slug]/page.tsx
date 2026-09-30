@@ -1,13 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { cache } from 'react'
+import { cache, Suspense } from 'react'
 import { SectionHeader } from '@/components/common/basics'
 import { CollectionCard } from '@/components/common/cards'
 import { CategoryIcon } from '@/components/common/category-icon'
 import { FollowButton } from '@/components/common/follow-button'
 import { TrackOnMount } from '@/components/common/track'
-import { ProductGrid } from '@/components/product/product-grid'
+import { ProductGrid, ProductGridSkeleton } from '@/components/product/product-grid'
 import { ProductListing } from '@/components/product/product-listing'
 import { getViewer } from '@/lib/auth'
 import { withCollectionImages } from '@/lib/db/content'
@@ -45,33 +45,13 @@ export default async function CategoryPage({ params, searchParams }: PageProps<'
   const viewer = await getViewer()
   const ids = await categoryIdsForSlug(slug)
 
-  const [{ data: children }, { data: parent }, { data: siblings }, { data: trending }, following, { data: links }] = await Promise.all([
+  const [{ data: children }, { data: parent }, following] = await Promise.all([
     supabase.from('categories').select('slug, name').eq('parent_id', category.id).order('sort_order'),
     category.parent_id ? supabase.from('categories').select('slug, name').eq('id', category.parent_id).maybeSingle() : Promise.resolve({ data: null }),
-    supabase.from('categories').select('slug, name').is('parent_id', null).neq('id', category.id).order('sort_order').limit(8),
-    supabase.from('product_cards').select(CARD_COLUMNS).eq('status', 'published').overlaps('category_ids', ids).order('popularity_score', { ascending: false }).limit(4),
     viewer
       ? supabase.from('category_followers').select('category_id').eq('user_id', viewer.id).eq('category_id', category.id).maybeSingle().then((r) => Boolean(r.data))
       : Promise.resolve(false),
-    supabase.from('product_categories').select('product_id').in('category_id', ids).limit(200),
   ])
-
-  // Public collections featuring products from this category.
-  const productIds = (links ?? []).map((l) => l.product_id)
-  const { data: colLinks } = productIds.length
-    ? await supabase.from('collection_products').select('collection_id').in('product_id', productIds).limit(200)
-    : { data: [] }
-  const collectionIds = [...new Set((colLinks ?? []).map((c) => c.collection_id))]
-  const { data: cols } = collectionIds.length
-    ? await supabase
-        .from('collections')
-        .select('id, slug, title, description, product_count, is_editorial, visibility, owner_id, follower_count, updated_at')
-        .in('id', collectionIds)
-        .eq('visibility', 'public')
-        .order('is_editorial', { ascending: false })
-        .limit(4)
-    : { data: [] }
-  const collections = await withCollectionImages(cols ?? [])
   const unfiltered = !Object.entries(filters).some(([k, v]) => k !== 'page' && v !== undefined && v !== false)
 
   return (
@@ -106,33 +86,76 @@ export default async function CategoryPage({ params, searchParams }: PageProps<'
       </section>
 
       <div className="container-page flex flex-col gap-16 py-12">
-        {unfiltered && (trending ?? []).length > 0 && (
-          <section>
-            <SectionHeader title={`Trending in ${category.name}`} />
-            <ProductGrid products={(trending ?? []) as ProductCardData[]} priorityCount={4} />
-          </section>
-        )}
-        <section>
-          <SectionHeader title={`All ${category.name}`} />
-          <ProductListing filters={filters} fixed={{ category: slug }} basePath={`/categories/${slug}`} />
-        </section>
-        {collections.length > 0 && (
-          <section>
-            <SectionHeader title="Collections" />
-            <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-              {collections.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
-            </div>
-          </section>
-        )}
-        <section>
-          <h2 className="eyebrow mb-3">Related categories</h2>
-          <div className="flex flex-wrap gap-2">
-            {(siblings ?? []).map((c) => (
-              <Link key={c.slug} href={`/categories/${c.slug}`} className="rounded-full border px-3 py-1.5 text-sm font-medium hover:border-foreground/30">{c.name}</Link>
-            ))}
-          </div>
-        </section>
+        <Suspense fallback={<ProductGridSkeleton count={8} />}>
+          <CategoryBody slug={slug} categoryId={category.id} name={category.name} filters={filters} unfiltered={unfiltered} />
+        </Suspense>
       </div>
     </div>
+  )
+}
+
+async function CategoryBody({ slug, categoryId, name, filters, unfiltered }: { slug: string; categoryId: string; name: string; filters: ReturnType<typeof parseFilters>; unfiltered: boolean }) {
+  const supabase = await createClient()
+  const ids = await categoryIdsForSlug(slug)
+  const [{ data: trending }, { data: siblings }] = await Promise.all([
+    unfiltered
+      ? supabase.from('product_cards').select(CARD_COLUMNS).eq('status', 'published').overlaps('category_ids', ids).order('popularity_score', { ascending: false }).limit(4)
+      : Promise.resolve({ data: [] }),
+    supabase.from('categories').select('slug, name').is('parent_id', null).neq('id', categoryId).order('sort_order').limit(8),
+  ])
+  return (
+    <>
+      {unfiltered && (trending ?? []).length > 0 && (
+        <section>
+          <SectionHeader title={`Trending in ${name}`} />
+          <ProductGrid products={(trending ?? []) as ProductCardData[]} priorityCount={4} />
+        </section>
+      )}
+      <section>
+        <SectionHeader title={`All ${name}`} />
+        <ProductListing filters={filters} fixed={{ category: slug }} basePath={`/categories/${slug}`} />
+      </section>
+      <Suspense fallback={null}>
+        <CategoryCollections ids={ids} />
+      </Suspense>
+      <section>
+        <h2 className="eyebrow mb-3">Related categories</h2>
+        <div className="flex flex-wrap gap-2">
+          {(siblings ?? []).map((c) => (
+            <Link key={c.slug} href={`/categories/${c.slug}`} className="rounded-full border px-3 py-1.5 text-sm font-medium hover:border-foreground/30">{c.name}</Link>
+          ))}
+        </div>
+      </section>
+    </>
+  )
+}
+
+// Public collections featuring products from this category.
+async function CategoryCollections({ ids }: { ids: string[] }) {
+  const supabase = await createClient()
+  const { data: links } = await supabase.from('product_categories').select('product_id').in('category_id', ids).limit(200)
+  const productIds = (links ?? []).map((l) => l.product_id)
+  const { data: colLinks } = productIds.length
+    ? await supabase.from('collection_products').select('collection_id').in('product_id', productIds).limit(200)
+    : { data: [] }
+  const collectionIds = [...new Set((colLinks ?? []).map((c) => c.collection_id))]
+  const { data: cols } = collectionIds.length
+    ? await supabase
+        .from('collections')
+        .select('id, slug, title, description, product_count, is_editorial, visibility, owner_id, follower_count, updated_at')
+        .in('id', collectionIds)
+        .eq('visibility', 'public')
+        .order('is_editorial', { ascending: false })
+        .limit(4)
+    : { data: [] }
+  const collections = await withCollectionImages(cols ?? [])
+  if (collections.length === 0) return null
+  return (
+    <section>
+      <SectionHeader title="Collections" />
+      <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+        {collections.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
+      </div>
+    </section>
   )
 }

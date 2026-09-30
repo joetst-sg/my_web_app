@@ -1,12 +1,13 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { Suspense } from 'react'
 import { ChevronRight } from 'lucide-react'
 import { SectionHeader } from '@/components/common/basics'
 import { CollectionCard } from '@/components/common/cards'
 import { TrackOnMount } from '@/components/common/track'
 import { ProductDetailView } from '@/components/product/product-detail-view'
-import { ProductGrid } from '@/components/product/product-grid'
+import { ProductGrid, ProductGridSkeleton } from '@/components/product/product-grid'
 import { getViewer } from '@/lib/auth'
 import { collectionsContainingProduct } from '@/lib/db/content'
 import { toProductView } from '@/lib/db/product-view'
@@ -48,20 +49,15 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
   const viewer = await getViewer()
   const supabase = await createClient()
 
-  const [{ data: related }, collections, viewerState] = await Promise.all([
-    supabase.rpc('related_products', { _product_id: product.id, result_limit: 8 }),
-    collectionsContainingProduct(product.id),
-    viewer
-      ? Promise.all([
-          supabase.from('product_saves').select('product_id').eq('user_id', viewer.id).eq('product_id', product.id).maybeSingle(),
-          supabase.from('reminders').select('id').eq('user_id', viewer.id).eq('product_id', product.id).eq('status', 'pending').limit(1),
-          product.brand
-            ? supabase.from('brand_followers').select('brand_id').eq('user_id', viewer.id).eq('brand_id', product.brand.id).maybeSingle()
-            : Promise.resolve({ data: null }),
-        ]).then(([s, r, f]) => ({ saved: Boolean(s.data), reminded: (r.data ?? []).length > 0, followsBrand: Boolean(f.data) }))
-      : Promise.resolve(undefined),
-  ])
-  const relatedCards = await productsByIds((related ?? []).map((r) => r.product_id))
+  const viewerState = viewer
+    ? await Promise.all([
+        supabase.from('product_saves').select('product_id').eq('user_id', viewer.id).eq('product_id', product.id).maybeSingle(),
+        supabase.from('reminders').select('id').eq('user_id', viewer.id).eq('product_id', product.id).eq('status', 'pending').limit(1),
+        product.brand
+          ? supabase.from('brand_followers').select('brand_id').eq('user_id', viewer.id).eq('brand_id', product.brand.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]).then(([s, r, f]) => ({ saved: Boolean(s.data), reminded: (r.data ?? []).length > 0, followsBrand: Boolean(f.data) }))
+    : undefined
 
   const url = `${site.url}/products/${product.slug}`
   const jsonLd = [
@@ -138,13 +134,29 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
 
       <ProductDetailView product={view} shareUrl={url} viewer={viewerState} />
 
+      <Suspense fallback={<div className="mt-20"><ProductGridSkeleton count={4} /></div>}>
+        <RelatedSections productId={product.id} />
+      </Suspense>
+    </div>
+  )
+}
+
+// Streamed after the main product content.
+async function RelatedSections({ productId }: { productId: string }) {
+  const supabase = await createClient()
+  const [{ data: related }, collections] = await Promise.all([
+    supabase.rpc('related_products', { _product_id: productId, result_limit: 8 }),
+    collectionsContainingProduct(productId),
+  ])
+  const relatedCards = await productsByIds((related ?? []).map((r) => r.product_id))
+  return (
+    <>
       {relatedCards.length > 0 && (
         <section className="mt-20">
           <SectionHeader title="Related products" subtitle="Same category, brand, tags or price range." />
           <ProductGrid products={relatedCards.slice(0, 8)} />
         </section>
       )}
-
       {collections.length > 0 && (
         <section className="mt-20">
           <SectionHeader title="In these collections" />
@@ -153,6 +165,6 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
           </div>
         </section>
       )}
-    </div>
+    </>
   )
 }

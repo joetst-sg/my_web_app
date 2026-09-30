@@ -1,7 +1,7 @@
 import 'server-only'
 import { cache } from 'react'
-import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
+import { getAuthUser } from '@/lib/auth'
 import type { Database } from '@/lib/supabase/database.types'
 
 export type ProductCardRow = Database['public']['Views']['product_cards']['Row']
@@ -16,58 +16,8 @@ export type ProductCardData = Pick<
   | 'is_new' | 'is_trending' | 'trending_rank' | 'deal_id' | 'deal_ends_at' | 'published_at' | 'save_count' | 'popularity_score'
 >
 
-export const sortOptions = [
-  { value: 'relevance', label: 'Most relevant' },
-  { value: 'newest', label: 'Newest' },
-  { value: 'trending', label: 'Trending' },
-  { value: 'most_saved', label: 'Most saved' },
-  { value: 'rating', label: 'Highest rated' },
-  { value: 'price_asc', label: 'Lowest price' },
-  { value: 'price_desc', label: 'Highest price' },
-  { value: 'discount', label: 'Biggest discount' },
-] as const
-
-const boolParam = z
-  .union([z.literal('1'), z.literal('true'), z.literal('0'), z.literal('false')])
-  .optional()
-  .transform((v) => v === '1' || v === 'true')
-
-const numParam = z.coerce.number().min(0).max(1_000_000).optional().catch(undefined)
-
-export const filterSchema = z.object({
-  q: z.string().trim().max(100).optional().catch(undefined),
-  category: z.string().regex(/^[a-z0-9-]+$/).max(60).optional().catch(undefined),
-  brand: z.string().regex(/^[a-z0-9-]+$/).max(60).optional().catch(undefined),
-  price_min: numParam,
-  price_max: numParam,
-  rating: z.coerce.number().min(0).max(10).optional().catch(undefined),
-  availability: z.enum(['available', 'coming_soon', 'preorder', 'crowdfunding', 'sold_out', 'discontinued']).optional().catch(undefined),
-  discount: boolParam.catch(false),
-  new: boolParam.catch(false),
-  trending: boolParam.catch(false),
-  featured: boolParam.catch(false),
-  crowdfunding: boolParam.catch(false),
-  deal: boolParam.catch(false),
-  sort: z.enum(sortOptions.map((s) => s.value) as [string, ...string[]]).optional().catch(undefined),
-  page: z.coerce.number().int().min(1).max(500).optional().catch(1),
-})
-
-export type ProductFilters = z.infer<typeof filterSchema>
-
-export function parseFilters(params: Record<string, string | string[] | undefined>): ProductFilters {
-  const flat = Object.fromEntries(Object.entries(params).map(([k, v]) => [k, Array.isArray(v) ? v[0] : v]))
-  return filterSchema.parse(flat)
-}
-
-export function filtersToSearchParams(filters: Partial<ProductFilters>) {
-  const sp = new URLSearchParams()
-  for (const [k, v] of Object.entries(filters)) {
-    if (v === undefined || v === null || v === false || v === '') continue
-    if (k === 'page' && v === 1) continue
-    sp.set(k, v === true ? '1' : String(v))
-  }
-  return sp
-}
+export { sortOptions, filterSchema, parseFilters, filtersToSearchParams, type ProductFilters } from '@/lib/filters'
+import { type ProductFilters } from '@/lib/filters'
 
 // Category slug -> ids of the category and its subcategories.
 export const categoryIdsForSlug = cache(async (slug: string) => {
@@ -192,9 +142,9 @@ export async function newestProducts(limit = 8) {
 
 // IDs of products (from a list) the viewer has saved / set reminders for.
 export async function viewerProductState(productIds: string[]) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const user = await getAuthUser()
   if (!user || productIds.length === 0) return { saved: new Set<string>(), reminded: new Set<string>() }
+  const supabase = await createClient()
   const [{ data: saves }, { data: reminders }] = await Promise.all([
     supabase.from('product_saves').select('product_id').eq('user_id', user.id).in('product_id', productIds),
     supabase.from('reminders').select('product_id').eq('user_id', user.id).eq('status', 'pending').in('product_id', productIds),
@@ -207,9 +157,11 @@ export async function viewerProductState(productIds: string[]) {
 
 export const getProductBySlug = cache(async (slug: string) => {
   const supabase = await createClient()
-  const { data: product } = await supabase
-    .from('products')
-    .select(`
+  // Both queries by slug, in parallel (one round trip instead of two).
+  const [{ data: product }, { data: card }] = await Promise.all([
+    supabase
+      .from('products')
+      .select(`
       id, slug, name, tagline, description, key_features, benefits, external_url, sku, currency, price, original_price,
       availability, status, published_at, updated_at, seller_id, seo_title, seo_description, save_count, view_count,
       brand:brands ( id, slug, name, tagline, description, logo_url, website_url, social_links, is_verified, follower_count ),
@@ -220,14 +172,15 @@ export const getProductBySlug = cache(async (slug: string) => {
       tags:product_tags ( tag:tags ( slug, name ) ),
       score:product_scores ( overall, design, innovation, usability, value, features, verdict )
     `)
-    .eq('slug', slug)
-    .maybeSingle()
+      .eq('slug', slug)
+      .maybeSingle(),
+    supabase
+      .from('product_cards')
+      .select('price, compare_at_price, discount_percent, deal_id, deal_ends_at, is_new, is_trending, is_featured')
+      .eq('slug', slug)
+      .maybeSingle(),
+  ])
   if (!product) return null
-  const { data: card } = await supabase
-    .from('product_cards')
-    .select('price, compare_at_price, discount_percent, deal_id, deal_ends_at, is_new, is_trending, is_featured')
-    .eq('id', product.id)
-    .maybeSingle()
   return {
     ...product,
     images: [...(product.images ?? [])].sort((a, b) => a.position - b.position),

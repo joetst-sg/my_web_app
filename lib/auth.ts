@@ -20,12 +20,23 @@ export type Viewer = {
   isAdmin: boolean
 }
 
-// The signed-in user with roles and profile, or null. Cached per request.
-// Uses getUser() (verified with Supabase Auth), never the unverified session.
-export const getViewer = cache(async (): Promise<Viewer | null> => {
+// The signed-in user's id and email from the verified session token, or
+// null. getClaims() checks the JWT signature (locally, with the project's
+// signing keys) — unlike getSession(), it can't be spoofed with a forged
+// cookie. Server actions that change data use getUser() instead.
+export const getAuthUser = cache(async (): Promise<{ id: string; email: string | null } | null> => {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data, error } = await supabase.auth.getClaims()
+  const sub = data?.claims?.sub
+  if (error || !sub) return null
+  return { id: sub, email: (data.claims.email as string | undefined) ?? null }
+})
+
+// The signed-in user with roles and profile, or null. Cached per request.
+export const getViewer = cache(async (): Promise<Viewer | null> => {
+  const user = await getAuthUser()
   if (!user) return null
+  const supabase = await createClient()
 
   const [{ data: roles }, { data: profile }, { data: settings }] = await Promise.all([
     supabase.from('user_roles').select('role').eq('user_id', user.id),
@@ -67,8 +78,4 @@ export async function requireAdmin() {
   return viewer
 }
 
-// Only allow redirects to local paths (prevents open redirects).
-export function safeNext(next: string | null | undefined, fallback = '/') {
-  if (!next || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return fallback
-  return next
-}
+export { safeNext } from '@/lib/validation'
