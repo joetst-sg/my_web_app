@@ -21,6 +21,7 @@ export function BasicsForm({ productId, initial, options }: { productId?: string
   const [v, setV] = useState<Values>({ ...empty, ...initial })
   const [dirty, setDirty] = useState(false)
   const [errors, setErrors] = useState<Record<string, string[] | undefined>>({})
+  const [formError, setFormError] = useState<string | null>(null)
   const [pending, start] = useTransition()
   useUnsavedChanges(dirty)
 
@@ -53,14 +54,27 @@ export function BasicsForm({ productId, initial, options }: { productId?: string
     setDirty(true)
   }
 
+  // Field ids in the order they appear, so we can focus the first problem.
+  const fieldOrder: [keyof Values, string][] = [
+    ['name', 'name'], ['brand_id', 'brand'], ['new_brand', 'new_brand'], ['external_url', 'external_url'],
+    ['tagline', 'tagline'], ['description', 'description'], ['category_id', 'category'], ['tags', 'tags'], ['sku', 'sku'],
+  ]
+
   function save(andContinue: boolean) {
     setErrors({})
+    setFormError(null)
     const input: BasicsInput = { ...v, brand_id: v.brand_id }
     start(async () => {
       const res = productId ? await saveBasics(productId, input) : await createProductDraft(input)
       if (!res.ok) {
-        setErrors(res.fieldErrors ?? {})
-        toast.error(res.error === 'LOGIN_REQUIRED' ? 'Your session expired. Please log in again.' : res.error)
+        const fe = res.fieldErrors ?? {}
+        const message = res.error === 'LOGIN_REQUIRED' ? 'Your session expired. Please log in again.' : res.error
+        setErrors(fe)
+        setFormError(message)
+        toast.error(message)
+        const first = fieldOrder.find(([k]) => fe[k]?.length)
+        if (first) document.getElementById(first[1])?.focus()
+        else document.getElementById('basics-error')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
         return
       }
       setDirty(false)
@@ -81,6 +95,12 @@ export function BasicsForm({ productId, initial, options }: { productId?: string
   const e = errors
   return (
     <form onSubmit={(ev) => { ev.preventDefault(); save(true) }} className="flex max-w-3xl flex-col gap-6" noValidate>
+      {formError && (
+        <div id="basics-error" role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          <p className="font-medium">Your draft wasn’t saved yet.</p>
+          <p>{formError}{Object.values(errors).some((x) => x?.length) && ' The fields that need attention are marked below.'}</p>
+        </div>
+      )}
       <div className="flex flex-col gap-2">
         <Label htmlFor="name">Product name</Label>
         <Input id="name" value={v.name} onChange={(ev) => set('name')(ev.target.value)} maxLength={120} className="h-11" aria-invalid={Boolean(e.name)} aria-describedby="name-help" />

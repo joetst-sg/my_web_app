@@ -168,6 +168,10 @@ export async function createProductDraft(input: BasicsInput): Promise<ActionResu
     })
     .select('id')
     .single()
+  if (error?.code === '23514' && error.message.includes('external_url')) {
+    const msg = 'Please enter a valid HTTPS URL (it must start with https://).'
+    return { ok: false, error: msg, fieldErrors: { external_url: [msg] } }
+  }
   if (error) return { ok: false, error: friendlyError(error, 'Something went wrong. Your draft was not saved — please try again.') }
 
   const catError = await syncCategoriesAndTags(supabase, product.id, d)
@@ -189,6 +193,10 @@ export async function saveBasics(productId: string, input: BasicsInput): Promise
     .from('products')
     .update({ name: d.name, brand_id: brand.id, external_url: d.external_url, tagline: d.tagline, description: d.description, sku: d.sku || null }, { count: 'exact' })
     .eq('id', productId)
+  if (error?.code === '23514' && error.message.includes('external_url')) {
+    const msg = 'Please enter a valid HTTPS URL (it must start with https://).'
+    return { ok: false, error: msg, fieldErrors: { external_url: [msg] } }
+  }
   if (error) return { ok: false, error: friendlyError(error) }
   if (!count) return { ok: false, error: 'This product can no longer be edited. It may be under review.' }
   const catError = await syncCategoriesAndTags(supabase, productId, d)

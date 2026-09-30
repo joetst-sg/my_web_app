@@ -42,6 +42,9 @@ export function WizardProgress({ current, productId, reachable }: { current: num
           )
         })}
       </ol>
+      {!productId && (
+        <p className="mt-2 text-sm text-muted-foreground">Fill in the basic info and click <strong>Save &amp; continue</strong> — the next steps unlock once your draft is saved.</p>
+      )}
       <p className="sr-only" aria-live="polite">Step {current} of {WIZARD_STEPS.length}: {WIZARD_STEPS[current - 1]}</p>
     </nav>
   )
