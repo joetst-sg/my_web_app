@@ -56,7 +56,18 @@ function Thumb({ img, index, onDelete, onReplace, onAlt, onPrimary, busy }: {
   )
 }
 
-export function MediaManager({ productId, initialImages, initialVideos }: { productId: string; initialImages: { id: string; storage_path: string; alt: string | null }[]; initialVideos: string[] }) {
+export function MediaManager({
+  productId,
+  initialImages,
+  initialVideos,
+  mode = 'wizard',
+}: {
+  productId: string
+  initialImages: { id: string; storage_path: string; alt: string | null }[]
+  initialVideos: string[]
+  // 'standalone' is used on the admin product page: no wizard navigation.
+  mode?: 'wizard' | 'standalone'
+}) {
   const router = useRouter()
   const input = useRef<HTMLInputElement>(null)
   const [images, setImages] = useState<Img[]>(initialImages.map((i) => ({ id: i.id, path: i.storage_path, alt: i.alt, src: productImageUrl(i.storage_path)! })))
@@ -73,7 +84,7 @@ export function MediaManager({ productId, initialImages, initialVideos }: { prod
     try {
       const prepared = await prepareImage(file)
       update({ preview: prepared.previewUrl })
-      const path = `products/${productId}/${crypto.randomUUID()}.webp`
+      const path = `products/${productId}/${crypto.randomUUID()}.${prepared.ext}`
       await uploadWithProgress('product-images', path, prepared.blob, (p) => update({ progress: p }))
       const res = await addProductImage(productId, { path, width: prepared.width, height: prepared.height })
       if (!res.ok) throw new UploadError(res.error)
@@ -149,7 +160,7 @@ export function MediaManager({ productId, initialImages, initialVideos }: { prod
 
   const busy = pending || uploads.some((u) => !u.error)
   return (
-    <div className="flex max-w-4xl flex-col gap-8">
+    <div className={cn('flex flex-col gap-8', mode === 'wizard' && 'max-w-4xl')}>
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
@@ -161,7 +172,7 @@ export function MediaManager({ productId, initialImages, initialVideos }: { prod
         <p className="text-sm text-muted-foreground">or</p>
         <input ref={input} id="files" type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(e) => { if (e.target.files?.length) void addFiles(e.target.files); e.target.value = '' }} />
         <Button type="button" variant="outline" size="lg" onClick={() => input.current?.click()} disabled={images.length >= MAX}>Browse files</Button>
-        <p className="text-xs text-muted-foreground">JPG, PNG, WebP or AVIF · at least 600×400 · up to 15 MB each · {images.length}/{MAX} images. We convert everything to optimized WebP.</p>
+        <p className="text-xs text-muted-foreground">JPG, PNG, WebP or AVIF · at least 600×400 · up to 15 MB each · {images.length}/{MAX} images. We convert everything to optimized WebP (JPEG in Safari).</p>
       </div>
 
       {uploads.length > 0 && (
@@ -217,7 +228,14 @@ export function MediaManager({ productId, initialImages, initialVideos }: { prod
         <p className="text-xs text-muted-foreground">YouTube and Vimeo links are embedded on your product page.</p>
       </section>
 
-      <StepActions pending={busy} onSave={() => saveAll(false)} onContinue={() => saveAll(true)} backHref={`/seller/products/${productId}/edit?step=2`} />
+      {mode === 'wizard' ? (
+        <StepActions pending={busy} onSave={() => saveAll(false)} onContinue={() => saveAll(true)} backHref={`/seller/products/${productId}/edit?step=2`} />
+      ) : (
+        <div className="flex items-center gap-3">
+          <Button type="button" variant="outline" onClick={() => saveAll(false)} disabled={busy}>Save video links</Button>
+          <span className="text-xs text-muted-foreground">Images save automatically as you upload, reorder or delete them.</span>
+        </div>
+      )}
     </div>
   )
 }

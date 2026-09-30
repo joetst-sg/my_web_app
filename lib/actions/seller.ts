@@ -246,7 +246,7 @@ export async function savePricing(productId: string, input: z.input<typeof prici
 // storage policy only accepts paths for products this user may edit)
 // ---------------------------------------------------------------------------
 
-const imagePath = z.string().regex(/^products\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.webp$/)
+const imagePath = z.string().regex(/^products\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(webp|jpg)$/)
 
 export async function addProductImage(
   productId: string,

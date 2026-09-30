@@ -20,7 +20,7 @@ export function AvatarUploader({ userId, name, current }: { userId: string; name
     try {
       setProgress(0)
       const img = await prepareImage(file, { minWidth: 128, minHeight: 128, maxSize: 512, maxBytes: 8 * 1024 * 1024 })
-      const publicUrl = await uploadWithProgress('avatars', `${userId}/${crypto.randomUUID()}.webp`, img.blob, setProgress)
+      const publicUrl = await uploadWithProgress('avatars', `${userId}/${crypto.randomUUID()}.${img.ext}`, img.blob, setProgress)
       start(async () => {
         const res = await setAvatar(publicUrl)
         if (res.ok) {

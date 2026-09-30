@@ -17,12 +17,13 @@ async function sniff(file: File): Promise<string | null> {
   return null
 }
 
-export type PreparedImage = { blob: Blob; width: number; height: number; previewUrl: string }
+export type PreparedImage = { blob: Blob; width: number; height: number; previewUrl: string; ext: 'webp' | 'jpg' }
 
 // Validates and re-encodes an image in the browser:
 // - checks declared MIME type, real file signature and size
 // - decodes it (so it's a real image), checks minimum dimensions
-// - resizes to maxSize and re-encodes as WebP, which also strips EXIF/GPS
+// - resizes to maxSize and re-encodes as WebP (JPEG where WebP encoding isn't
+//   supported), which also strips EXIF/GPS
 export async function prepareImage(
   file: File,
   { maxBytes = 15 * 1024 * 1024, minWidth = 600, minHeight = 400, maxSize = 2400, quality = 0.86 } = {},
@@ -54,9 +55,17 @@ export async function prepareImage(
   if (!ctx) throw new UploadError('Your browser could not process this image.')
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality))
-  if (!blob || blob.type !== 'image/webp') throw new UploadError('Your browser could not convert this image. Please try another browser.')
-  return { blob, width, height, previewUrl: URL.createObjectURL(blob) }
+  // Prefer WebP; browsers that can't encode it (Safari) produce JPEG instead.
+  let blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/webp', quality))
+  let ext: 'webp' | 'jpg' = 'webp'
+  if (!blob || blob.type !== 'image/webp') {
+    blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality))
+    ext = 'jpg'
+  }
+  if (!blob || (blob.type !== 'image/webp' && blob.type !== 'image/jpeg')) {
+    throw new UploadError('Your browser could not process this image. Please try another browser.')
+  }
+  return { blob, width, height, previewUrl: URL.createObjectURL(blob), ext }
 }
 
 // Uploads to Supabase Storage with progress (XHR). Storage policies check

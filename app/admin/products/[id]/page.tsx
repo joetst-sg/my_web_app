@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import { ExternalLink, FileCheck2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SubmissionStatusBadge } from '@/components/common/submission-status'
+import { MediaManager } from '@/components/seller/media-manager'
 import { getEditableProduct } from '@/lib/db/seller'
 import { createClient } from '@/lib/supabase/server'
 import { ProductEditor } from './product-editor'
@@ -32,9 +33,18 @@ export default async function AdminProductPage({ params }: PageProps<'/admin/pro
           {product.submission && <SubmissionStatusBadge status={product.submission.status} />}
           {product.submission && <Button asChild variant="outline"><Link href={`/admin/submissions/${product.submission.id}`}><FileCheck2 />Review & workflow</Link></Button>}
           {product.status === 'published' && <Button asChild variant="outline"><Link href={`/products/${product.slug}`}><ExternalLink />View live</Link></Button>}
-          <Button asChild variant="outline"><Link href={`/seller/products/${product.id}/edit?step=3`}>Images & specs</Link></Button>
+          <Button asChild variant="outline"><Link href={`/seller/products/${product.id}/edit?step=4`}>Features & specs</Link></Button>
         </div>
       </div>
+      <section aria-labelledby="images-h" className="rounded-2xl border bg-background p-5">
+        <h2 id="images-h" className="mb-4 font-sans text-base font-semibold tracking-normal">Images & video</h2>
+        <MediaManager
+          mode="standalone"
+          productId={product.id}
+          initialImages={product.images}
+          initialVideos={product.videos.map((v) => v.url)}
+        />
+      </section>
       <ProductEditor
         product={{
           id: product.id,

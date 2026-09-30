@@ -53,7 +53,7 @@ export function ArticleEditor({
     try {
       setProgress(0)
       const img = await prepareImage(file, { minWidth: 1200, minHeight: 600 })
-      const url = await uploadWithProgress('article-images', `articles/${crypto.randomUUID()}.webp`, img.blob, setProgress)
+      const url = await uploadWithProgress('article-images', `articles/${crypto.randomUUID()}.${img.ext}`, img.blob, setProgress)
       set('featured_image_url', url)
     } catch (e) {
       toast.error(e instanceof UploadError ? e.message : 'Upload failed. Please try again.')

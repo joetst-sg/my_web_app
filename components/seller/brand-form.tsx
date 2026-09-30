@@ -53,7 +53,7 @@ export function BrandForm({ productId, brand, isOwner, seller }: { productId: st
     try {
       setProgress(0)
       const img = await prepareImage(file, { minWidth: 128, minHeight: 128, maxSize: 512 })
-      const url = await uploadWithProgress('brand-images', `brands/${brand!.id}/${crypto.randomUUID()}.webp`, img.blob, setProgress)
+      const url = await uploadWithProgress('brand-images', `brands/${brand!.id}/${crypto.randomUUID()}.${img.ext}`, img.blob, setProgress)
       setLogo(url)
       setDirty(true)
     } catch (e) {
