@@ -5,8 +5,8 @@ import { useEffect } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { WIZARD_STEPS } from '@/lib/wizard'
 
-export const WIZARD_STEPS = ['Basic info', 'Pricing', 'Images', 'Features', 'Seller', 'Preview & submit'] as const
 
 export function WizardProgress({ current, productId, reachable }: { current: number; productId?: string; reachable: number }) {
   return (
