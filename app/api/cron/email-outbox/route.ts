@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     }
     try {
       await provider.send(row.to_email, email)
-      await supabase.from('email_outbox').update({ status: 'sent', sent_at: new Date().toISOString(), attempts: row.attempts + 1 }).eq('id', row.id)
+      await supabase.from('email_outbox').update({ status: 'sent', sent_at: new Date().toISOString(), attempts: row.attempts + 1, last_error: null }).eq('id', row.id)
       sent++
     } catch (e) {
       const attempts = row.attempts + 1

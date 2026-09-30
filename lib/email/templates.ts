@@ -73,6 +73,13 @@ export const templates: Record<string, (p: Payload) => Rendered> = {
   }),
 }
 
+// Used to check that email delivery works end to end.
+templates.test = () => ({
+  subject: `${site.name} email test`,
+  html: layout('Email delivery works', `<p>This is a test message from ${esc(site.name)}. If you can read it, notification emails are being delivered.</p>`),
+  text: `This is a test message from ${site.name}. Notification emails are being delivered.`,
+})
+
 export function renderEmail(template: string, payload: Payload): Rendered | null {
   const fn = templates[template]
   return fn ? fn(payload ?? {}) : null
