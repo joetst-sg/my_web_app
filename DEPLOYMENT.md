@@ -37,7 +37,17 @@ Production runs on **Vercel** (app) + **Supabase** (database, auth, storage). Pu
 ## 4. Scheduled work
 
 - **Database jobs** (publishing, reminders, trending, cleanup) run inside Supabase with pg_cron — nothing to configure on Vercel.
-- **Email sending**: `vercel.json` schedules `/api/cron/email-outbox` daily (the Vercel Hobby limit). On Pro, change the schedule (e.g. `*/5 * * * *`), or call the route from any scheduler with `Authorization: Bearer $CRON_SECRET`.
+- **Email sending** is near-real-time: when an email is queued, a database trigger (`pg_net`) calls `/api/cron/email-outbox` within seconds, and the `loupe-email-retry` pg_cron job retries anything pending every 5 minutes. Vercel Cron also runs it daily as a backup. This needs two values in the database (never in git):
+
+  ```sql
+  -- must equal CRON_SECRET in Vercel
+  select vault.create_secret('<secret>', 'email_sender_secret');
+  -- or to rotate: select vault.update_secret((select id from vault.secrets where name = 'email_sender_secret'), '<new secret>');
+  insert into public.site_settings (key, value) values ('email.sender_url', '"https://your-domain/api/cron/email-outbox"')
+    on conflict (key) do update set value = excluded.value;
+  ```
+
+  When you change `CRON_SECRET` in Vercel, update the Vault secret to the same value (and redeploy). Check delivery with `select * from net._http_response order by created desc limit 5;` and `select status, last_error from public.email_outbox order by created_at desc limit 10;`.
 
 ## 5. First admin
 

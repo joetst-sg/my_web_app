@@ -101,7 +101,7 @@ draft ─submit─► submitted ─start_review─► under_review
 ## Notifications and email
 
 - In-app notifications are written by database functions (workflow changes, reminders, price drops, new followers, collection activity).
-- Emails are inserted into `email_outbox` in the same transaction and sent by `/api/cron/email-outbox` through `lib/email/provider.ts` (Resend or console). Auth emails (confirm, reset, email change) are sent by Supabase Auth.
+- Emails are inserted into `email_outbox` in the same transaction and sent by `/api/cron/email-outbox` through `lib/email/provider.ts` (Resend or console). A statement-level trigger calls that route via `pg_net` right after commit (seconds), a pg_cron job retries every 5 minutes, and Vercel Cron runs daily as a backup. Auth emails (confirm, reset, email change) are sent by Supabase Auth through custom SMTP.
 
 ## Decisions and trade-offs
 
@@ -109,4 +109,4 @@ draft ─submit─► submitted ─start_review─► under_review
 - **Status vs availability**: coming-soon/sold-out/pre-order/crowdfunding are `availability`, separate from workflow `status`, so a published product can be sold out.
 - **No checkout**: the platform links out; `/go/product/[id]` only redirects to `https://` URLs of published products.
 - **Homepage**: fully database-driven (`homepage_sections`), editable in `/admin/content`.
-- **Emails on Vercel Hobby**: Vercel Cron runs daily on Hobby; for near-real-time email use a paid plan or call the route more often from any scheduler.
+- **Emails on Vercel Hobby**: Vercel Cron only runs daily on Hobby, so the database triggers sending instead (pg_net), keeping delivery within seconds at no cost.

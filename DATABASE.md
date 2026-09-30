@@ -15,6 +15,8 @@ PostgreSQL 17 on Supabase. All schema changes are SQL migrations in `supabase/mi
 | `…0007_cron.sql` | pg_cron jobs |
 | `…0008_lock_down_functions.sql` | Revokes API access to trigger/internal functions |
 | `…0009_submissions_switch.sql` | Admin switch to pause new submissions |
+| `…0010_url_query_strings.sql` | Allow `?query` right after the host in product URLs |
+| `…0011_realtime_email.sql` | `pg_net` trigger that calls the email sender when emails are queued; 5-minute retry job |
 
 ### Running migrations
 
@@ -77,6 +79,7 @@ Errors meant for users are raised as `LOUPE:<CODE>` with a human-readable `DETAI
 | `loupe-reminders` | every minute | `process_due_reminders()` — custom-date, launch and sale reminders |
 | `loupe-popularity` | every 10 minutes | `refresh_popularity_scores()` |
 | `loupe-cleanup` | daily 03:17 UTC | `cleanup_old_data()` |
+| `loupe-email-retry` | every 5 minutes | `retry_pending_emails()` — calls the email sender if real emails are pending |
 
 Inspect with `select * from cron.job;` and `select * from cron.job_run_details order by start_time desc limit 20;`.
 
