@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { deleteHomepageSection, reorderHomepageSections, saveHomepageSection } from '@/lib/actions/admin'
 
-type Section = { id: string; type: string; title: string | null; subtitle: string | null; config: { limit?: number; product_ids?: string[] }; is_enabled: boolean }
+type Section = { id: string; type: string; title: string | null; subtitle: string | null; translations?: unknown; config: { limit?: number; product_ids?: string[] }; is_enabled: boolean }
 
 export const SECTION_TYPES = {
   hero: 'Hero (featured product)',
@@ -31,6 +31,8 @@ function Row({ section, index, total, ids, products }: { section: Section; index
   const [v, setV] = useState({
     title: section.title ?? '',
     subtitle: section.subtitle ?? '',
+    zh_title: ((section.translations as Record<string, Record<string, string>> | undefined)?.['zh-HK']?.title ?? ''),
+    zh_subtitle: ((section.translations as Record<string, Record<string, string>> | undefined)?.['zh-HK']?.subtitle ?? ''),
     limit: String(section.config?.limit ?? 8),
     product_ids: section.config?.product_ids ?? [],
     is_enabled: section.is_enabled,
@@ -66,7 +68,7 @@ function Row({ section, index, total, ids, products }: { section: Section; index
       </div>
       {section.type !== 'hero' && (
         <form
-          className="mt-4 grid gap-3 sm:grid-cols-[1fr_1.4fr_6rem_auto]"
+          className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1.4fr_1fr_1.4fr_6rem_auto]"
           onSubmit={(e) => {
             e.preventDefault()
             run(() => saveHomepageSection({ id: section.id, type: section.type as never, ...v, limit: v.limit as never }))
@@ -74,10 +76,12 @@ function Row({ section, index, total, ids, products }: { section: Section; index
         >
           <div className="flex flex-col gap-1.5"><Label htmlFor={`t-${section.id}`}>Title</Label><Input id={`t-${section.id}`} value={v.title} maxLength={80} onChange={(e) => setV({ ...v, title: e.target.value })} /></div>
           <div className="flex flex-col gap-1.5"><Label htmlFor={`s-${section.id}`}>Subtitle</Label><Input id={`s-${section.id}`} value={v.subtitle} maxLength={200} onChange={(e) => setV({ ...v, subtitle: e.target.value })} /></div>
+          <div className="flex flex-col gap-1.5"><Label htmlFor={`zt-${section.id}`}>Title (繁體中文)</Label><Input id={`zt-${section.id}`} lang="zh-HK" value={v.zh_title} maxLength={80} onChange={(e) => setV({ ...v, zh_title: e.target.value })} /></div>
+          <div className="flex flex-col gap-1.5"><Label htmlFor={`zs-${section.id}`}>Subtitle (繁體中文)</Label><Input id={`zs-${section.id}`} lang="zh-HK" value={v.zh_subtitle} maxLength={200} onChange={(e) => setV({ ...v, zh_subtitle: e.target.value })} /></div>
           <div className="flex flex-col gap-1.5"><Label htmlFor={`l-${section.id}`}>Items</Label><Input id={`l-${section.id}`} inputMode="numeric" value={v.limit} onChange={(e) => setV({ ...v, limit: e.target.value.replace(/\D/g, '') })} /></div>
           <div className="flex items-end"><Button type="submit" variant="outline" disabled={pending}>Save</Button></div>
           {section.type === 'product_list' && (
-            <div className="flex flex-col gap-2 sm:col-span-4">
+            <div className="flex flex-col gap-2 sm:col-span-2 xl:col-span-6">
               <p className="text-sm font-medium">Products</p>
               <ol className="flex flex-wrap gap-1.5">
                 {v.product_ids.map((id) => (

@@ -1,5 +1,6 @@
 // Small dependency-free daily bar chart (SVG) with an accessible table.
 export function DailyBarChart({
+  dayLabel = 'Day',
   data,
   series,
   height = 160,
@@ -9,6 +10,7 @@ export function DailyBarChart({
   series: { key: string; label: string; color: string }[]
   height?: number
   label: string
+  dayLabel?: string
 }) {
   const max = Math.max(1, ...data.flatMap((d) => series.map((s) => d.values[s.key] ?? 0)))
   const w = 100 / Math.max(data.length, 1)
@@ -41,7 +43,7 @@ export function DailyBarChart({
       </figcaption>
       <table className="sr-only">
         <caption>{label}</caption>
-        <thead><tr><th>Day</th>{series.map((s) => <th key={s.key}>{s.label}</th>)}</tr></thead>
+        <thead><tr><th>{dayLabel}</th>{series.map((s) => <th key={s.key}>{s.label}</th>)}</tr></thead>
         <tbody>{data.map((d) => <tr key={d.day}><td>{d.day}</td>{series.map((s) => <td key={s.key}>{d.values[s.key] ?? 0}</td>)}</tr>)}</tbody>
       </table>
     </figure>

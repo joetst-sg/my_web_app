@@ -1,5 +1,8 @@
+'use client'
+
 import { StatusPill } from './basics'
-import { labels } from '@/lib/format'
+import { useT } from '@/components/i18n/provider'
+import type { MessageKey } from '@/lib/i18n/translate'
 
 const tones = {
   draft: 'neutral',
@@ -14,6 +17,7 @@ const tones = {
 } as const
 
 export function SubmissionStatusBadge({ status }: { status: string }) {
+  const t = useT()
   const s = status as keyof typeof tones
-  return <StatusPill tone={tones[s] ?? 'neutral'}>{labels.submissionStatus[s] ?? status}</StatusPill>
+  return <StatusPill tone={tones[s] ?? 'neutral'}>{tones[s] ? t(`labels.submissionStatus.${s}` as MessageKey) : status}</StatusPill>
 }

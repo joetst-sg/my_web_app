@@ -5,7 +5,7 @@ export async function featuredCategories(limit = 12) {
   const supabase = await createClient()
   const { data } = await supabase
     .from('categories')
-    .select('id, slug, name, description, color, icon, follower_count')
+    .select('id, slug, name, description, color, icon, follower_count, translations')
     .is('parent_id', null)
     .order('is_featured', { ascending: false })
     .order('sort_order')
@@ -17,7 +17,7 @@ export async function allCategories() {
   const supabase = await createClient()
   const { data } = await supabase
     .from('categories')
-    .select('id, slug, name, description, color, icon, parent_id, follower_count, sort_order')
+    .select('id, slug, name, description, color, icon, parent_id, follower_count, sort_order, translations')
     .order('sort_order')
   return data ?? []
 }
@@ -138,7 +138,7 @@ export async function homepageSections() {
   const supabase = await createClient()
   const { data } = await supabase
     .from('homepage_sections')
-    .select('id, type, title, subtitle, config, position')
+    .select('id, type, title, subtitle, config, position, translations')
     .eq('is_enabled', true)
     .order('position')
   return data ?? []

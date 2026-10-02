@@ -7,13 +7,15 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { FieldError, FormMessage, SubmitButton } from '@/components/common/form-bits'
 import { updateProfile } from '@/lib/actions/account'
-import { formatDate } from '@/lib/format'
+import { useFormatters, useT } from '@/components/i18n/provider'
 
 type Defaults = { username: string; display_name: string; bio: string; website: string; instagram: string; x: string; is_public: boolean }
 
 export function ProfileForm({ defaults, memberSince }: { defaults: Defaults; memberSince: string | null }) {
   const [state, action] = useActionState(updateProfile, null)
   const fe = state?.fieldErrors
+  const t = useT()
+  const f = useFormatters()
   const field = (name: keyof Defaults, label: string, props: React.ComponentProps<typeof Input> = {}) => (
     <div className="flex flex-col gap-2">
       <Label htmlFor={name}>{label}</Label>
@@ -24,23 +26,23 @@ export function ProfileForm({ defaults, memberSince }: { defaults: Defaults; mem
   return (
     <form action={action} className="mt-8 flex flex-col gap-5">
       <FormMessage error={state?.error} message={state?.message} />
-      {field('display_name', 'Display name', { required: true, maxLength: 80 })}
-      {field('username', 'Username', { required: true, pattern: '[a-zA-Z0-9_]{3,30}' })}
+      {field('display_name', t('account.profile.displayName'), { required: true, maxLength: 80 })}
+      {field('username', t('account.profile.username'), { required: true, pattern: '[a-zA-Z0-9_]{3,30}' })}
       <div className="flex flex-col gap-2">
-        <Label htmlFor="bio">Bio</Label>
+        <Label htmlFor="bio">{t('account.profile.bio')}</Label>
         <Textarea id="bio" name="bio" defaultValue={defaults.bio} maxLength={500} rows={3} />
       </div>
-      {field('website', 'Website', { type: 'url', placeholder: 'https://…' })}
+      {field('website', t('common.website'), { type: 'url', placeholder: 'https://…' })}
       <div className="grid gap-5 sm:grid-cols-2">
-        {field('instagram', 'Instagram URL', { type: 'url', placeholder: 'https://instagram.com/…' })}
-        {field('x', 'X URL', { type: 'url', placeholder: 'https://x.com/…' })}
+        {field('instagram', t('account.profile.instagram'), { type: 'url', placeholder: 'https://instagram.com/…' })}
+        {field('x', t('account.profile.x'), { type: 'url', placeholder: 'https://x.com/…' })}
       </div>
       <div className="flex items-center gap-2">
         <Switch id="is_public" name="is_public" defaultChecked={defaults.is_public} />
-        <Label htmlFor="is_public" className="font-normal">Public profile — show my name on public collections</Label>
+        <Label htmlFor="is_public" className="font-normal">{t('account.profile.public')}</Label>
       </div>
-      {memberSince && <p className="text-sm text-muted-foreground">Member since {formatDate(memberSince)}</p>}
-      <div><SubmitButton pendingLabel="Saving…">Save profile</SubmitButton></div>
+      {memberSince && <p className="text-sm text-muted-foreground">{t('account.profile.memberSince', { date: f.date(memberSince) })}</p>}
+      <div><SubmitButton pendingLabel={t('common.saving')}>{t('account.profile.save')}</SubmitButton></div>
     </form>
   )
 }

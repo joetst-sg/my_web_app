@@ -1,4 +1,5 @@
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
+import { getT } from '@/lib/i18n/server'
 import { cn } from '@/lib/utils'
 import { site } from '@/lib/site'
 
@@ -14,9 +15,10 @@ export function LoupeMark({ className }: { className?: string }) {
   )
 }
 
-export function Logo({ className }: { className?: string }) {
+export async function Logo({ className }: { className?: string }) {
+  const t = await getT()
   return (
-    <Link href="/" className={cn('inline-flex items-center gap-2 rounded-md', className)} aria-label={`${site.name} home`}>
+    <Link href="/" className={cn('inline-flex items-center gap-2 rounded-md', className)} aria-label={t('common.homeLink', { name: site.name })}>
       <LoupeMark />
       <span className="font-display text-xl font-bold tracking-tight">{site.name}</span>
     </Link>

@@ -29,7 +29,7 @@ export const httpsUrl = z
   .string()
   .trim()
   .max(2000)
-  .refine(isSafeHttpsUrl, 'Please enter a valid HTTPS URL (it must start with https://).')
+  .refine(isSafeHttpsUrl, 'v.httpsUrl')
 
 export const optionalHttpsUrl = z
   .string()
@@ -37,7 +37,7 @@ export const optionalHttpsUrl = z
   .max(2000)
   .optional()
   .transform((v) => (v ? v : undefined))
-  .refine((v) => v === undefined || isSafeHttpsUrl(v), 'Please enter a valid HTTPS URL (it must start with https://).')
+  .refine((v) => v === undefined || isSafeHttpsUrl(v), 'v.httpsUrl')
 
 export function videoProvider(url: string): 'youtube' | 'vimeo' | 'other' {
   try {

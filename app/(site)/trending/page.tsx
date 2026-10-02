@@ -2,23 +2,18 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/common/basics'
 import { ProductListing } from '@/components/product/product-listing'
 import { parseFilters } from '@/lib/db/products'
+import { alternatesFor, getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = {
-  title: 'Trending products',
-  description: 'The products people are saving, sharing and clicking through to most right now.',
-  alternates: { canonical: '/trending' },
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('pages.trending.metaTitle'), description: t('pages.trending.meta'), alternates: await alternatesFor('/trending') }
 }
 
 export default async function TrendingPage({ searchParams }: PageProps<'/trending'>) {
-  const filters = parseFilters(await searchParams)
+  const [filters, t] = await Promise.all([searchParams.then(parseFilters), getT()])
   return (
     <div className="container-page py-10">
-      <PageHeader
-        eyebrow="Trending"
-        title="Trending now"
-        description="Ranked by a popularity score that weighs saves, collection adds, click-throughs, shares and views, with recent activity counting most. Updated every 10 minutes."
-        className="mb-8"
-      />
+      <PageHeader eyebrow={t('nav.trending')} title={t('pages.trending.title')} description={t('pages.trending.description')} className="mb-8" />
       <ProductListing filters={filters} basePath="/trending" defaultSort="trending" />
     </div>
   )

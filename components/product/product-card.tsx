@@ -1,7 +1,9 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { cn } from '@/lib/utils'
-import { labels } from '@/lib/format'
+import { fromTranslations } from '@/lib/i18n/content'
+import { getI18n } from '@/lib/i18n/server'
+import type { MessageKey } from '@/lib/i18n/translate'
 import { productImageUrl } from '@/lib/images'
 import type { ProductCardData } from '@/lib/db/products'
 import { DiscountBadge, PriceDisplay, RatingBadge } from './price'
@@ -21,7 +23,7 @@ export type ProductCardProps = {
   className?: string
 }
 
-export function ProductCard({
+export async function ProductCard({
   product: p,
   isSaved = false,
   hasReminder = false,
@@ -33,16 +35,17 @@ export function ProductCard({
   reason,
   className,
 }: ProductCardProps) {
+  const { t, locale } = await getI18n()
   const img = productImageUrl(p.image_path)
   const flag =
     p.availability && p.availability !== 'available'
-      ? labels.availability[p.availability as keyof typeof labels.availability]
+      ? t(`labels.availability.${p.availability}` as MessageKey)
       : p.is_featured
-        ? 'Featured'
+        ? t('product.flagFeatured')
         : p.is_trending
-          ? 'Trending'
+          ? t('product.flagTrending')
           : p.is_new
-            ? 'New'
+            ? t('product.flagNew')
             : null
 
   return (
@@ -85,7 +88,7 @@ export function ProductCard({
           <span className="truncate">
             {p.brand_name}
             {p.category_name && <span aria-hidden> · </span>}
-            {p.category_name}
+            {fromTranslations(p.category_translations, 'name', locale, p.category_name)}
           </span>
           <RatingBadge score={p.score} className="h-5" />
         </div>

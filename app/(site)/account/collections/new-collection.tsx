@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useLocalizedRouter, useT } from '@/components/i18n/provider'
 import { useState, useTransition } from 'react'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,7 +13,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { createCollection } from '@/lib/actions/engagement'
 
 export function NewCollectionButton() {
-  const router = useRouter()
+  const router = useLocalizedRouter()
+  const t = useT()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -30,7 +31,7 @@ export function NewCollectionButton() {
         setError(res.error)
         return
       }
-      toast.success('Collection created')
+      toast.success(t('act.collectionCreated'))
       setOpen(false)
       router.push(`/account/collections/${res.data.id}`)
     })
@@ -39,29 +40,29 @@ export function NewCollectionButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="lg"><Plus />New collection</Button>
+        <Button size="lg"><Plus />{t('collections.new')}</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New collection</DialogTitle>
-          <DialogDescription>You can add products from any product page.</DialogDescription>
+          <DialogTitle>{t('collections.new')}</DialogTitle>
+          <DialogDescription>{t('account.collections.addHint')}</DialogDescription>
         </DialogHeader>
         <form action={submit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
-            <Label htmlFor="col-title">Name</Label>
-            <Input id="col-title" name="title" required minLength={2} maxLength={80} placeholder="My dream desk setup" />
+            <Label htmlFor="col-title">{t('account.collections.name')}</Label>
+            <Input id="col-title" name="title" required minLength={2} maxLength={80} placeholder={t('collections.namePlaceholder')} />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="col-desc">Description (optional)</Label>
+            <Label htmlFor="col-desc">{t('account.collections.description')} {t('common.optional')}</Label>
             <Textarea id="col-desc" name="description" maxLength={600} rows={3} />
           </div>
           <div className="flex items-center gap-2">
             <Switch id="col-public" name="public" />
-            <Label htmlFor="col-public" className="font-normal">Public — show on my profile and allow sharing</Label>
+            <Label htmlFor="col-public" className="font-normal">{t('account.collections.publicProfile')}</Label>
           </div>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <Button type="submit" size="lg" disabled={pending}>{pending ? 'Creating…' : 'Create collection'}</Button>
+            <Button type="submit" size="lg" disabled={pending}>{pending ? t('account.collections.creating') : t('account.collections.create')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

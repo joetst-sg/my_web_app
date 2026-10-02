@@ -1,16 +1,17 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { useEffect } from 'react'
 import { Check, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { WIZARD_STEPS } from '@/lib/wizard'
-
+import { useT } from '@/components/i18n/provider'
 
 export function WizardProgress({ current, productId, reachable }: { current: number; productId?: string; reachable: number }) {
+  const t = useT()
   return (
-    <nav aria-label="Submission steps" className="mb-8">
+    <nav aria-label={t('seller.steps.label')} className="mb-8">
       <ol className="flex gap-1 overflow-x-auto pb-1">
         {WIZARD_STEPS.map((label, i) => {
           const step = i + 1
@@ -27,7 +28,7 @@ export function WizardProgress({ current, productId, reachable }: { current: num
               >
                 {done ? <Check className="size-3.5" aria-hidden /> : step}
               </span>
-              <span className={cn('whitespace-nowrap text-sm', isCurrent ? 'font-semibold' : 'text-muted-foreground')}>{label}</span>
+              <span className={cn('whitespace-nowrap text-sm', isCurrent ? 'font-semibold' : 'text-muted-foreground')}>{t(label)}</span>
             </span>
           )
           return (
@@ -43,9 +44,9 @@ export function WizardProgress({ current, productId, reachable }: { current: num
         })}
       </ol>
       {!productId && (
-        <p className="mt-2 text-sm text-muted-foreground">Fill in the basic info and click <strong>Save &amp; continue</strong> — the next steps unlock once your draft is saved.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{t('seller.steps.unlockBefore')}<strong>{t('seller.steps.saveContinue')}</strong>{t('seller.steps.unlockAfter')}</p>
       )}
-      <p className="sr-only" aria-live="polite">Step {current} of {WIZARD_STEPS.length}: {WIZARD_STEPS[current - 1]}</p>
+      <p className="sr-only" aria-live="polite">{t('seller.steps.status', { current, total: WIZARD_STEPS.length, label: t(WIZARD_STEPS[current - 1]) })}</p>
     </nav>
   )
 }
@@ -68,7 +69,7 @@ export function StepActions({
   onSave,
   onContinue,
   backHref,
-  continueLabel = 'Save & continue',
+  continueLabel,
 }: {
   pending: boolean
   onSave?: () => void
@@ -76,14 +77,15 @@ export function StepActions({
   backHref?: string
   continueLabel?: string
 }) {
+  const t = useT()
   return (
     <div className="sticky bottom-0 z-10 -mx-4 mt-10 flex flex-wrap items-center justify-between gap-3 border-t bg-background/95 px-4 py-4 backdrop-blur sm:mx-0 sm:rounded-2xl sm:border sm:px-5">
-      {backHref ? <Button asChild variant="ghost" size="lg"><Link href={backHref}>Back</Link></Button> : <span />}
+      {backHref ? <Button asChild variant="ghost" size="lg"><Link href={backHref}>{t('common.back')}</Link></Button> : <span />}
       <div className="flex gap-2">
-        {onSave && <Button type="button" variant="outline" size="lg" onClick={onSave} disabled={pending}>Save draft</Button>}
+        {onSave && <Button type="button" variant="outline" size="lg" onClick={onSave} disabled={pending}>{t('seller.saveDraft')}</Button>}
         <Button type="button" size="lg" onClick={onContinue} disabled={pending}>
           {pending && <Loader2 className="animate-spin" />}
-          {continueLabel}
+          {continueLabel ?? t('seller.steps.saveContinue')}
         </Button>
       </div>
     </div>

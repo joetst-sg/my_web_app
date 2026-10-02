@@ -19,7 +19,8 @@ describe('isSafeHttpsUrl', () => {
   it('gives a friendly message', () => {
     const r = httpsUrl.safeParse('http://example.com')
     expect(r.success).toBe(false)
-    expect(r.error?.issues[0].message).toBe('Please enter a valid HTTPS URL (it must start with https://).')
+    // A dictionary key, translated where it is shown.
+    expect(r.error?.issues[0].message).toBe('v.httpsUrl')
   })
 })
 

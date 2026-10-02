@@ -6,8 +6,10 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { trackEvent } from '@/lib/actions/engagement'
+import { useT } from '@/components/i18n/provider'
 
 export function ShareButton({ url, title, productId, className }: { url: string; title: string; productId?: string; className?: string }) {
+  const t = useT()
   const [copied, setCopied] = useState(false)
   const track = (channel: string) => {
     if (productId) void trackEvent({ event: 'product_share', productId, channel }).catch(() => {})
@@ -24,10 +26,10 @@ export function ShareButton({ url, title, productId, className }: { url: string;
     try {
       await navigator.clipboard.writeText(url)
       setCopied(true)
-      toast.success('Link copied')
+      toast.success(t('share.copied'))
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      toast.error('Could not copy. Select the address bar and copy the link instead.')
+      toast.error(t('share.copyFailed'))
     }
     track('copy_link')
   }
@@ -35,15 +37,15 @@ export function ShareButton({ url, title, productId, className }: { url: string;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="lg" className={className} aria-label={`Share ${title}`}>
+        <Button variant="outline" size="lg" className={className} aria-label={t('share.ariaLabel', { title })}>
           <Share2 />
-          Share
+          {t('share.share')}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuItem onSelect={(e) => { e.preventDefault(); void copy() }}>
           {copied ? <Check /> : <Copy />}
-          Copy link
+          {t('share.copyLink')}
         </DropdownMenuItem>
         {targets.map(([key, label, href]) => (
           <DropdownMenuItem key={key} asChild>
@@ -53,7 +55,7 @@ export function ShareButton({ url, title, productId, className }: { url: string;
         <DropdownMenuItem asChild>
           <a href={`mailto:?subject=${enc(title)}&body=${enc(url)}`} onClick={() => track('email')}>
             <Mail />
-            Email
+            {t('share.email')}
           </a>
         </DropdownMenuItem>
       </DropdownMenuContent>

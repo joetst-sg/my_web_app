@@ -8,13 +8,15 @@ import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 import { setAvatar } from '@/lib/actions/account'
 import { initials } from '@/lib/images'
-import { prepareImage, uploadWithProgress, UploadError } from '@/lib/upload'
+import { prepareImage, uploadWithProgress, uploadErrorText } from '@/lib/upload'
+import { useT } from '@/components/i18n/provider'
 
 export function AvatarUploader({ userId, name, current }: { userId: string; name: string; current: string | null }) {
   const input = useRef<HTMLInputElement>(null)
   const [url, setUrl] = useState(current)
   const [progress, setProgress] = useState<number | null>(null)
   const [pending, start] = useTransition()
+  const t = useT()
 
   async function onFile(file: File) {
     try {
@@ -25,11 +27,11 @@ export function AvatarUploader({ userId, name, current }: { userId: string; name
         const res = await setAvatar(publicUrl)
         if (res.ok) {
           setUrl(publicUrl)
-          toast.success('Avatar updated')
+          toast.success(t('act.avatarUpdated'))
         } else toast.error(res.error)
       })
     } catch (e) {
-      toast.error(e instanceof UploadError ? e.message : 'Upload failed. Please try again.')
+      toast.error(uploadErrorText(e, t))
     } finally {
       setProgress(null)
       if (input.current) input.current.value = ''
@@ -47,7 +49,7 @@ export function AvatarUploader({ userId, name, current }: { userId: string; name
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => input.current?.click()} disabled={progress !== null || pending}>
             <Upload />
-            {url ? 'Change avatar' : 'Upload avatar'}
+            {url ? t('account.profile.changeAvatar') : t('account.profile.uploadAvatar')}
           </Button>
           {url && (
             <Button
@@ -58,11 +60,11 @@ export function AvatarUploader({ userId, name, current }: { userId: string; name
                 if (res.ok) setUrl(null)
               })}
             >
-              Remove
+              {t('common.remove')}
             </Button>
           )}
         </div>
-        {progress !== null ? <Progress value={progress * 100} className="w-48" aria-label="Upload progress" /> : <p className="text-xs text-muted-foreground">JPG, PNG or WebP, at least 128×128.</p>}
+        {progress !== null ? <Progress value={progress * 100} className="w-48" aria-label={t('account.profile.uploadProgress')} /> : <p className="text-xs text-muted-foreground">{t('account.profile.avatarHint')}</p>}
       </div>
     </div>
   )

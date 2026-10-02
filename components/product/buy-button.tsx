@@ -1,4 +1,7 @@
+'use client'
+
 import { ArrowUpRight } from 'lucide-react'
+import { useT } from '@/components/i18n/provider'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 
@@ -6,7 +9,7 @@ import { buttonVariants } from '@/components/ui/button'
 // click and redirects to the maker's https URL.
 export function BuyButton({
   productId,
-  label = 'Buy now',
+  label,
   className,
   size = 'lg',
 }: {
@@ -15,6 +18,7 @@ export function BuyButton({
   className?: string
   size?: 'lg' | 'default'
 }) {
+  const t = useT()
   return (
     <a
       href={`/go/product/${productId}`}
@@ -22,9 +26,9 @@ export function BuyButton({
       rel="nofollow noopener sponsored"
       className={cn(buttonVariants({ size }), size === 'lg' && 'h-11 rounded-full px-5 text-[0.95rem]', className)}
     >
-      {label}
+      {label ?? t('product.buyNow')}
       <ArrowUpRight />
-      <span className="sr-only"> (opens the maker&apos;s website in a new tab)</span>
+      <span className="sr-only"> {t('product.opensMakerSite')}</span>
     </a>
   )
 }

@@ -1,32 +1,34 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { Tag } from 'lucide-react'
 import { EmptyState, PageHeader, StatusPill } from '@/components/common/basics'
 import { DiscountBadge, PriceDisplay } from '@/components/product/price'
 import { cn } from '@/lib/utils'
 import { dealCards } from '@/lib/db/content'
-import { formatDate } from '@/lib/format'
+import { alternatesFor, getI18n } from '@/lib/i18n/server'
+import type { MessageKey } from '@/lib/i18n/translate'
+import { fromTranslations } from '@/lib/i18n/content'
 import { productImageUrl } from '@/lib/images'
 
-export const metadata: Metadata = {
-  title: 'Deals',
-  description: 'Verified discounts and limited-time offers on products reviewed by our editors.',
-  alternates: { canonical: '/deals' },
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n()
+  return { title: t('nav.deals'), description: t('pages.deals.meta'), alternates: await alternatesFor('/deals') }
 }
 
-const statuses = [['active', 'Active'], ['upcoming', 'Upcoming'], ['expired', 'Expired']] as const
+const statuses = [['active', 'deals.active'], ['upcoming', 'deals.upcoming'], ['expired', 'deals.expired']] as const
 
 export default async function DealsPage({ searchParams }: PageProps<'/deals'>) {
   const sp = await searchParams
+  const { t, f, locale } = await getI18n()
   const status = (statuses.find(([s]) => s === sp.status)?.[0] ?? 'active') as 'active' | 'upcoming' | 'expired'
   const category = typeof sp.category === 'string' && /^[a-z0-9-]+$/.test(sp.category) ? sp.category : undefined
   const deals = await dealCards({ status, category, limit: 60 })
-  const categories = [...new Map((await dealCards({ status, limit: 200 })).map((d) => [d.category_slug, d.category_name])).entries()]
+  const categories = [...new Map((await dealCards({ status, limit: 200 })).map((d) => [d.category_slug, fromTranslations(d.category_translations, 'name', locale, d.category_name)])).entries()]
 
   return (
     <div className="container-page py-10">
-      <PageHeader eyebrow="Deals" title="Deals worth knowing about" description="Price drops and offers on products we cover. We check every deal before listing it." className="mb-8" />
+      <PageHeader eyebrow={t('nav.deals')} title={t('pages.deals.title')} description={t('pages.deals.description')} className="mb-8" />
       <div className="mb-8 flex flex-wrap items-center gap-2">
         {statuses.map(([value, label]) => (
           <Link
@@ -35,7 +37,7 @@ export default async function DealsPage({ searchParams }: PageProps<'/deals'>) {
             aria-current={status === value ? 'page' : undefined}
             className={cn('rounded-full px-4 py-2 text-sm font-medium', status === value ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}
           >
-            {label}
+            {t(label as MessageKey)}
           </Link>
         ))}
         <span className="mx-2 h-6 w-px bg-border" aria-hidden />
@@ -51,7 +53,7 @@ export default async function DealsPage({ searchParams }: PageProps<'/deals'>) {
         ))}
       </div>
       {deals.length === 0 ? (
-        <EmptyState icon={Tag} title={`No ${status} deals right now`} description="Set a sale reminder on any product and we'll tell you when its price drops." />
+        <EmptyState icon={Tag} title={t(`pages.deals.empty_${status}` as MessageKey)} description={t('pages.deals.emptyHint')} />
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {deals.map((d) => (
@@ -63,7 +65,7 @@ export default async function DealsPage({ searchParams }: PageProps<'/deals'>) {
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-muted-foreground">{d.brand_name}</span>
                   <StatusPill tone={d.deal_status === 'active' ? 'success' : d.deal_status === 'upcoming' ? 'info' : 'neutral'}>
-                    {d.deal_status === 'active' ? 'Active' : d.deal_status === 'upcoming' ? 'Upcoming' : 'Expired'}
+                    {t(`deals.${d.deal_status}` as MessageKey)}
                   </StatusPill>
                 </div>
                 <h2 className="font-sans text-lg font-semibold leading-snug tracking-normal">
@@ -75,8 +77,8 @@ export default async function DealsPage({ searchParams }: PageProps<'/deals'>) {
                   <DiscountBadge percent={d.discount_percent} />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {d.deal_status === 'upcoming' ? `Starts ${formatDate(d.starts_at)}` : d.ends_at ? `${d.deal_status === 'expired' ? 'Ended' : 'Ends'} ${formatDate(d.ends_at)}` : 'No end date'}
-                  {d.coupon_code && d.deal_status === 'active' && <> · Code <span className="font-mono font-semibold text-foreground">{d.coupon_code}</span></>}
+                  {d.deal_status === 'upcoming' ? t('deals.startsOn', { date: f.date(d.starts_at) }) : d.ends_at ? t(d.deal_status === 'expired' ? 'deals.endedOn' : 'deals.endsOn', { date: f.date(d.ends_at) }) : t('deals.noEnd')}
+                  {d.coupon_code && d.deal_status === 'active' && <> · {t('deals.code')} <span className="font-mono font-semibold text-foreground">{d.coupon_code}</span></>}
                 </p>
               </div>
             </article>

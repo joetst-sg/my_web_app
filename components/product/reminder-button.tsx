@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { LoginPrompt } from '@/components/common/login-prompt'
 import { createReminder } from '@/lib/actions/engagement'
 import { LOGIN_REQUIRED } from '@/lib/errors'
+import { useT } from '@/components/i18n/provider'
 
 type ReminderType = 'launch' | 'sale' | 'custom'
 
@@ -30,6 +31,7 @@ export function ReminderButton({
   variant?: 'icon' | 'full'
   className?: string
 }) {
+  const t = useT()
   const upcoming = availability === 'coming_soon' || availability === 'crowdfunding' || availability === 'preorder'
   const [open, setOpen] = useState(false)
   const [loginOpen, setLoginOpen] = useState(false)
@@ -56,7 +58,7 @@ export function ReminderButton({
       }
       setIsSet(true)
       setOpen(false)
-      toast.success(res.message ?? 'Reminder set')
+      toast.success(res.message ?? t('reminder.setToast'))
     })
   }
 
@@ -70,8 +72,8 @@ export function ReminderButton({
           type="button"
           size="icon-lg"
           variant="secondary"
-          aria-label={`Set a reminder for ${productName}`}
-          title={isSet ? 'Reminder set' : 'Remind me'}
+          aria-label={t('reminder.ariaLabel', { name: productName })}
+          title={isSet ? t('reminder.isSet') : t('reminder.remindMe')}
           onClick={(e) => {
             e.preventDefault()
             e.stopPropagation()
@@ -84,38 +86,38 @@ export function ReminderButton({
       ) : (
         <Button type="button" size="lg" variant="outline" onClick={() => setOpen(true)} className={className}>
           <Icon />
-          {isSet ? 'Reminder set' : 'Remind me'}
+          {isSet ? t('reminder.isSet') : t('reminder.remindMe')}
         </Button>
       )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
           <DialogHeader>
-            <DialogTitle>Remind me about {productName}</DialogTitle>
-            <DialogDescription>We&apos;ll send a notification{' '}and an email if you have email updates turned on.</DialogDescription>
+            <DialogTitle>{t('reminder.title', { name: productName })}</DialogTitle>
+            <DialogDescription>{t('reminder.description')}</DialogDescription>
           </DialogHeader>
           <RadioGroup value={type} onValueChange={(v) => setType(v as ReminderType)} className="gap-3">
             <label className="flex items-start gap-3 rounded-lg border p-3 has-[[data-state=checked]]:border-foreground">
               <RadioGroupItem value="launch" id={`r-launch-${productId}`} className="mt-0.5" />
               <span>
-                <span className="block text-sm font-medium">When it launches</span>
-                <span className="block text-xs text-muted-foreground">For pre-orders, crowdfunding and coming-soon products.</span>
+                <span className="block text-sm font-medium">{t('reminder.launch')}</span>
+                <span className="block text-xs text-muted-foreground">{t('reminder.launchHint')}</span>
               </span>
             </label>
             <label className="flex items-start gap-3 rounded-lg border p-3 has-[[data-state=checked]]:border-foreground">
               <RadioGroupItem value="sale" id={`r-sale-${productId}`} className="mt-0.5" />
               <span>
-                <span className="block text-sm font-medium">When it goes on sale</span>
-                <span className="block text-xs text-muted-foreground">We&apos;ll tell you when there&apos;s a deal or a discount.</span>
+                <span className="block text-sm font-medium">{t('reminder.sale')}</span>
+                <span className="block text-xs text-muted-foreground">{t('reminder.saleHint')}</span>
               </span>
             </label>
             <label className="flex items-start gap-3 rounded-lg border p-3 has-[[data-state=checked]]:border-foreground">
               <RadioGroupItem value="custom" id={`r-custom-${productId}`} className="mt-0.5" />
               <span className="flex-1">
-                <span className="block text-sm font-medium">On a date I choose</span>
+                <span className="block text-sm font-medium">{t('reminder.custom')}</span>
                 {type === 'custom' && (
                   <span className="mt-2 block">
-                    <Label htmlFor={`r-date-${productId}`} className="sr-only">Reminder date and time</Label>
+                    <Label htmlFor={`r-date-${productId}`} className="sr-only">{t('reminder.dateLabel')}</Label>
                     <Input id={`r-date-${productId}`} type="datetime-local" min={minDate} value={date} onChange={(e) => setDate(e.target.value)} />
                   </span>
                 )}
@@ -124,14 +126,14 @@ export function ReminderButton({
           </RadioGroup>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
-            <Button variant="outline" size="lg" onClick={() => setOpen(false)}>Cancel</Button>
+            <Button variant="outline" size="lg" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
             <Button size="lg" onClick={submit} disabled={pending || (type === 'custom' && !date)}>
-              {pending ? 'Setting…' : 'Set reminder'}
+              {pending ? t('reminder.setting') : t('reminder.set')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <LoginPrompt open={loginOpen} onOpenChange={setLoginOpen} reason="get reminders about launches and sales" />
+      <LoginPrompt open={loginOpen} onOpenChange={setLoginOpen} reason="loginPrompt.reasonRemind" />
     </>
   )
 }

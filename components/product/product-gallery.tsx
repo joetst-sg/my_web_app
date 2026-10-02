@@ -5,10 +5,12 @@ import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Expand } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { useT } from '@/components/i18n/provider'
 
 type Img = { id: string; src: string; alt: string; width: number; height: number }
 
 export function ProductGallery({ images, name }: { images: Img[]; name: string }) {
+  const t = useT()
   const [index, setIndex] = useState(0)
   const [full, setFull] = useState(false)
   const [zoom, setZoom] = useState<{ x: number; y: number } | null>(null)
@@ -38,10 +40,10 @@ export function ProductGallery({ images, name }: { images: Img[]; name: string }
       <div
         ref={track}
         className="flex snap-x snap-mandatory overflow-x-auto rounded-3xl bg-muted [scrollbar-width:none] md:hidden"
-        aria-label={`${name} images, swipe to see more`}
+        aria-label={t('gallery.swipe', { name })}
       >
         {images.map((img, i) => (
-          <button key={img.id} type="button" onClick={() => setFull(true)} className="w-full shrink-0 snap-center" aria-label={`Open image ${i + 1} of ${images.length} full screen`}>
+          <button key={img.id} type="button" onClick={() => setFull(true)} className="w-full shrink-0 snap-center" aria-label={t('gallery.openN', { n: i + 1, total: images.length })}>
             <Image src={img.src} alt={img.alt} width={img.width} height={img.height} priority={i === 0} sizes="100vw" className="aspect-[4/3] w-full object-cover" />
           </button>
         ))}
@@ -58,7 +60,7 @@ export function ProductGallery({ images, name }: { images: Img[]; name: string }
             setZoom({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 })
           }}
           onMouseLeave={() => setZoom(null)}
-          aria-label="Open image full screen"
+          aria-label={t('gallery.open')}
         >
           <Image
             src={current.src}
@@ -72,19 +74,19 @@ export function ProductGallery({ images, name }: { images: Img[]; name: string }
           />
         </button>
         <span className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full bg-background/90 px-2.5 py-1 text-xs font-medium">
-          <Expand className="size-3.5" aria-hidden /> Hover to zoom
+          <Expand className="size-3.5" aria-hidden /> {t('gallery.hoverZoom')}
         </span>
       </div>
 
       {images.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Choose image">
+        <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label={t('gallery.choose')}>
           {images.map((img, i) => (
             <button
               key={img.id}
               type="button"
               role="tab"
               aria-selected={i === index}
-              aria-label={`Image ${i + 1}`}
+              aria-label={t('gallery.imageN', { n: i + 1 })}
               onClick={() => goTo(i)}
               className={cn('shrink-0 overflow-hidden rounded-xl border-2 transition-colors', i === index ? 'border-foreground' : 'border-transparent opacity-70 hover:opacity-100')}
             >
@@ -99,15 +101,15 @@ export function ProductGallery({ images, name }: { images: Img[]; name: string }
           if (e.key === 'ArrowRight') goTo(index + 1)
           if (e.key === 'ArrowLeft') goTo(index - 1)
         }}>
-          <DialogTitle className="sr-only">{name} — image {index + 1} of {images.length}</DialogTitle>
-          <DialogDescription className="sr-only">Use the arrow keys to move between images.</DialogDescription>
+          <DialogTitle className="sr-only">{t('gallery.dialogTitle', { name, n: index + 1, total: images.length })}</DialogTitle>
+          <DialogDescription className="sr-only">{t('gallery.arrowKeys')}</DialogDescription>
           <Image src={current.src} alt={current.alt} width={current.width} height={current.height} sizes="96vw" className="max-h-[88dvh] w-full rounded-lg object-contain" />
           {images.length > 1 && (
             <>
-              <button type="button" onClick={() => goTo(index - 1)} aria-label="Previous image" className="absolute left-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-black">
+              <button type="button" onClick={() => goTo(index - 1)} aria-label={t('gallery.previous')} className="absolute left-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-black">
                 <ChevronLeft />
               </button>
-              <button type="button" onClick={() => goTo(index + 1)} aria-label="Next image" className="absolute right-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-black">
+              <button type="button" onClick={() => goTo(index + 1)} aria-label={t('gallery.next')} className="absolute right-3 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-black">
                 <ChevronRight />
               </button>
             </>

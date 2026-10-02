@@ -1,6 +1,6 @@
 import 'server-only'
 import { cache } from 'react'
-import { redirect } from 'next/navigation'
+import { redirect } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -62,19 +62,19 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
 
 export async function requireViewer(next?: string) {
   const viewer = await getViewer()
-  if (!viewer) redirect(`/login${next ? `?next=${encodeURIComponent(next)}` : ''}`)
+  if (!viewer) return redirect(`/login${next ? `?next=${encodeURIComponent(next)}` : ''}`)
   return viewer
 }
 
 export async function requireStaff() {
   const viewer = await requireViewer('/admin')
-  if (!viewer.isStaff) redirect('/forbidden')
+  if (!viewer.isStaff) return redirect('/forbidden')
   return viewer
 }
 
 export async function requireAdmin() {
   const viewer = await requireViewer('/admin')
-  if (!viewer.isAdmin) redirect('/forbidden')
+  if (!viewer.isAdmin) return redirect('/forbidden')
   return viewer
 }
 

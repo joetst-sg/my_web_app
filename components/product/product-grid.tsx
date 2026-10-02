@@ -2,6 +2,7 @@ import { cn } from '@/lib/utils'
 import type { ProductCardData } from '@/lib/db/products'
 import { viewerProductState } from '@/lib/db/products'
 import { ProductCard, type ProductCardProps } from './product-card'
+import { getT } from '@/lib/i18n/server'
 
 // Server component: renders cards with the viewer's saved/reminder state
 // fetched in one query (no N+1).
@@ -46,9 +47,10 @@ export async function ProductGrid({
   )
 }
 
-export function ProductGridSkeleton({ count = 8 }: { count?: number }) {
+export async function ProductGridSkeleton({ count = 8 }: { count?: number }) {
+  const t = await getT()
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 md:grid-cols-3 xl:grid-cols-4" aria-busy="true" aria-label="Loading products">
+    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:gap-x-6 md:grid-cols-3 xl:grid-cols-4" aria-busy="true" aria-label={t('common.loadingProducts')}>
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex flex-col gap-3">
           <div className="aspect-[4/3] animate-pulse rounded-2xl bg-muted" />

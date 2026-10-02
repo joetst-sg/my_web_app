@@ -1,10 +1,11 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
+import { redirect } from '@/lib/i18n/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
-import { friendlyError, LOGIN_REQUIRED, type ActionResult } from '@/lib/errors'
+import { LOGIN_REQUIRED, type ActionResult } from '@/lib/errors'
+import { i18nAction } from '@/lib/i18n/errors'
 import { randomSuffix, slugify } from '@/lib/format'
 import { httpsUrl, optionalHttpsUrl, videoProvider } from '@/lib/validation'
 import type { FormState } from './auth'
@@ -29,9 +30,9 @@ async function uniqueSlug(table: 'products' | 'brands' | 'tags', base: string) {
 // ---------------------------------------------------------------------------
 
 const sellerProfileSchema = z.object({
-  company_name: z.string().trim().min(2, 'Enter your company or maker name.').max(120),
+  company_name: z.string().trim().min(2, 'v.company').max(120),
   website: optionalHttpsUrl.transform((v) => v ?? null),
-  contact_email: z.string().trim().email('Enter a valid email address.').max(254),
+  contact_email: z.string().trim().email('v.email').max(254),
   bio: z.string().trim().max(1000).optional().transform((v) => v || null),
   instagram: optionalHttpsUrl,
   x: optionalHttpsUrl,
@@ -39,33 +40,35 @@ const sellerProfileSchema = z.object({
 })
 
 export async function becomeSeller(_: FormState, formData: FormData): Promise<FormState> {
+  const { err, fe } = await i18nAction()
   const parsed = sellerProfileSchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return { fieldErrors: fe(parsed.error.flatten().fieldErrors) }
   const { supabase, user } = await seller()
-  if (!user) redirect('/login?next=/seller')
+  if (!user) return redirect('/login?next=/seller')
   const { instagram, x, linkedin, ...rest } = parsed.data
   const { error } = await supabase.from('seller_profiles').insert({
     user_id: user.id,
     ...rest,
     social_links: Object.fromEntries(Object.entries({ instagram, x, linkedin }).filter(([, v]) => v)),
   })
-  if (error && error.code !== '23505') return { error: friendlyError(error) }
-  redirect('/seller/dashboard?welcome=1')
+  if (error && error.code !== '23505') return { error: err(error) }
+  return redirect('/seller/dashboard?welcome=1')
 }
 
 export async function updateSellerProfile(_: FormState, formData: FormData): Promise<FormState> {
+  const { t, err, fe } = await i18nAction()
   const parsed = sellerProfileSchema.safeParse(Object.fromEntries(formData))
-  if (!parsed.success) return { fieldErrors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return { fieldErrors: fe(parsed.error.flatten().fieldErrors) }
   const { supabase, user } = await seller()
-  if (!user) return { error: 'Please log in again.' }
+  if (!user) return { error: t('errors.loginAgain') }
   const { instagram, x, linkedin, ...rest } = parsed.data
   const { error } = await supabase
     .from('seller_profiles')
     .update({ ...rest, social_links: Object.fromEntries(Object.entries({ instagram, x, linkedin }).filter(([, v]) => v)) })
     .eq('user_id', user.id)
-  if (error) return { error: friendlyError(error) }
+  if (error) return { error: err(error) }
   revalidatePath('/seller', 'layout')
-  return { message: 'Seller profile saved.' }
+  return { message: t('act.sellerProfileSaved') }
 }
 
 // ---------------------------------------------------------------------------
@@ -73,12 +76,12 @@ export async function updateSellerProfile(_: FormState, formData: FormData): Pro
 // ---------------------------------------------------------------------------
 
 const basicsSchema = z.object({
-  name: z.string().trim().min(2, 'Enter the product name.').max(120),
+  name: z.string().trim().min(2, 'v.productName').max(120),
   brand_id: z.string().optional(),
   new_brand: z.string().trim().max(80).optional(),
   external_url: httpsUrl,
-  tagline: z.string().trim().min(10, 'Write a short description of at least 10 characters.').max(200),
-  description: z.string().trim().min(80, 'Write a full description of at least 80 characters.').max(20000),
+  tagline: z.string().trim().min(10, 'v.tagline').max(200),
+  description: z.string().trim().min(80, 'v.description').max(20000),
   category_id: uuid.optional().or(z.literal('').transform(() => undefined)),
   subcategory_id: uuid.optional().or(z.literal('').transform(() => undefined)),
   tags: z.string().max(400).optional(),
@@ -88,18 +91,19 @@ const basicsSchema = z.object({
 export type BasicsInput = z.input<typeof basicsSchema>
 
 async function resolveBrand(supabase: Awaited<ReturnType<typeof createClient>>, data: z.infer<typeof basicsSchema>) {
+  const { t, err } = await i18nAction()
   if (data.brand_id && data.brand_id !== 'new') {
-    if (!uuid.safeParse(data.brand_id).success) return { error: 'Choose a brand.' }
+    if (!uuid.safeParse(data.brand_id).success) return { error: t('v.brand') }
     return { id: data.brand_id }
   }
   const name = data.new_brand?.trim()
-  if (!name || name.length < 1) return { error: 'Choose a brand or enter a new brand name.' }
+  if (!name || name.length < 1) return { error: t('v.brandOrNew') }
   const { data: brand, error } = await supabase
     .from('brands')
     .insert({ name, slug: await uniqueSlug('brands', name) })
     .select('id')
     .single()
-  if (error) return { error: friendlyError(error) }
+  if (error) return { error: err(error) }
   return { id: brand.id }
 }
 
@@ -108,6 +112,7 @@ async function syncCategoriesAndTags(
   productId: string,
   data: { category_id?: string; subcategory_id?: string; tags?: string },
 ) {
+  const { err } = await i18nAction()
   await supabase.from('product_categories').delete().eq('product_id', productId)
   const cats = [
     data.category_id && { product_id: productId, category_id: data.category_id, is_primary: true },
@@ -115,7 +120,7 @@ async function syncCategoriesAndTags(
   ].filter(Boolean) as { product_id: string; category_id: string; is_primary: boolean }[]
   if (cats.length) {
     const { error } = await supabase.from('product_categories').insert(cats)
-    if (error) return friendlyError(error)
+    if (error) return err(error)
   }
 
   const names = [...new Set((data.tags ?? '').split(',').map((t) => t.trim().toLowerCase()).filter((t) => t.length >= 2 && t.length <= 40))].slice(0, 12)
@@ -139,15 +144,16 @@ async function syncCategoriesAndTags(
     const ids = [...(existing ?? []), ...created].map((t) => t.id)
     if (ids.length) {
       const { error } = await supabase.from('product_tags').insert(ids.map((tag_id) => ({ product_id: productId, tag_id })))
-      if (error) return friendlyError(error)
+      if (error) return err(error)
     }
   }
   return null
 }
 
 export async function createProductDraft(input: BasicsInput): Promise<ActionResult<{ id: string }>> {
+  const { t, err, fe } = await i18nAction()
   const parsed = basicsSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return { ok: false, error: t('errors.fixFields'), fieldErrors: fe(parsed.error.flatten().fieldErrors) }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
 
@@ -169,21 +175,22 @@ export async function createProductDraft(input: BasicsInput): Promise<ActionResu
     .select('id')
     .single()
   if (error?.code === '23514' && error.message.includes('external_url')) {
-    const msg = 'Please enter a valid HTTPS URL (it must start with https://).'
+    const msg = t('v.httpsUrl')
     return { ok: false, error: msg, fieldErrors: { external_url: [msg] } }
   }
-  if (error) return { ok: false, error: friendlyError(error, 'Something went wrong. Your draft was not saved — please try again.') }
+  if (error) return { ok: false, error: err(error, 'errors.draftNotSaved') }
 
   const catError = await syncCategoriesAndTags(supabase, product.id, d)
   if (catError) return { ok: false, error: catError }
   revalidatePath('/seller', 'layout')
-  return { ok: true, data: { id: product.id }, message: 'Draft saved' }
+  return { ok: true, data: { id: product.id }, message: t('act.draftSaved') }
 }
 
 export async function saveBasics(productId: string, input: BasicsInput): Promise<ActionResult> {
-  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { t, err, fe } = await i18nAction()
+  if (!uuid.safeParse(productId).success) return { ok: false, error: t('errors.unknownItem') }
   const parsed = basicsSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return { ok: false, error: t('errors.fixFields'), fieldErrors: fe(parsed.error.flatten().fieldErrors) }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const brand = await resolveBrand(supabase, parsed.data)
@@ -194,22 +201,22 @@ export async function saveBasics(productId: string, input: BasicsInput): Promise
     .update({ name: d.name, brand_id: brand.id, external_url: d.external_url, tagline: d.tagline, description: d.description, sku: d.sku || null }, { count: 'exact' })
     .eq('id', productId)
   if (error?.code === '23514' && error.message.includes('external_url')) {
-    const msg = 'Please enter a valid HTTPS URL (it must start with https://).'
+    const msg = t('v.httpsUrl')
     return { ok: false, error: msg, fieldErrors: { external_url: [msg] } }
   }
-  if (error) return { ok: false, error: friendlyError(error) }
-  if (!count) return { ok: false, error: 'This product can no longer be edited. It may be under review.' }
+  if (error) return { ok: false, error: err(error) }
+  if (!count) return { ok: false, error: t('errors.notEditable') }
   const catError = await syncCategoriesAndTags(supabase, productId, d)
   if (catError) return { ok: false, error: catError }
   revalidatePath(`/seller/products/${productId}`, 'layout')
-  return { ok: true, message: 'Saved' }
+  return { ok: true, message: t('act.saved') }
 }
 
 // ---------------------------------------------------------------------------
 // Step 2 — pricing
 // ---------------------------------------------------------------------------
 
-const money = z.coerce.number().min(0, 'Prices cannot be negative.').max(1_000_000)
+const money = z.coerce.number().min(0, 'v.priceNegative').max(1_000_000)
 const pricingSchema = z
   .object({
     price: money,
@@ -219,13 +226,14 @@ const pricingSchema = z
     sale_starts_at: z.string().optional(),
     sale_ends_at: z.string().optional(),
   })
-  .refine((v) => !v.original_price || v.original_price >= v.price, { message: 'The original price should be higher than the current price.', path: ['original_price'] })
-  .refine((v) => !v.sale_starts_at || !v.sale_ends_at || new Date(v.sale_ends_at) > new Date(v.sale_starts_at), { message: 'The sale must end after it starts.', path: ['sale_ends_at'] })
+  .refine((v) => !v.original_price || v.original_price >= v.price, { message: 'v.originalPrice', path: ['original_price'] })
+  .refine((v) => !v.sale_starts_at || !v.sale_ends_at || new Date(v.sale_ends_at) > new Date(v.sale_starts_at), { message: 'v.saleEnd', path: ['sale_ends_at'] })
 
 export async function savePricing(productId: string, input: z.input<typeof pricingSchema>): Promise<ActionResult> {
-  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { t, err, fe } = await i18nAction()
+  if (!uuid.safeParse(productId).success) return { ok: false, error: t('errors.unknownItem') }
   const parsed = pricingSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return { ok: false, error: t('errors.fixFields'), fieldErrors: fe(parsed.error.flatten().fieldErrors) }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const d = parsed.data
@@ -244,9 +252,9 @@ export async function savePricing(productId: string, input: z.input<typeof prici
       { count: 'exact' },
     )
     .eq('id', productId)
-  if (error) return { ok: false, error: friendlyError(error) }
-  if (!count) return { ok: false, error: 'This product can no longer be edited. It may be under review.' }
-  return { ok: true, message: 'Saved' }
+  if (error) return { ok: false, error: err(error) }
+  if (!count) return { ok: false, error: t('errors.notEditable') }
+  return { ok: true, message: t('act.saved') }
 }
 
 // ---------------------------------------------------------------------------
@@ -260,13 +268,14 @@ export async function addProductImage(
   productId: string,
   input: { path: string; width: number; height: number; alt?: string },
 ): Promise<ActionResult<{ id: string }>> {
+  const { t, err } = await i18nAction()
   if (!uuid.safeParse(productId).success || !imagePath.safeParse(input.path).success || !input.path.includes(productId)) {
-    return { ok: false, error: 'Upload failed. Please try again.' }
+    return { ok: false, error: t('errors.uploadFailed') }
   }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const { count: existing } = await supabase.from('product_images').select('id', { count: 'exact', head: true }).eq('product_id', productId)
-  if ((existing ?? 0) >= 12) return { ok: false, error: 'You can add up to 12 images.' }
+  if ((existing ?? 0) >= 12) return { ok: false, error: t('errors.maxImages') }
   const { data: last } = await supabase.from('product_images').select('position').eq('product_id', productId).order('position', { ascending: false }).limit(1).maybeSingle()
   const { data, error } = await supabase
     .from('product_images')
@@ -280,58 +289,62 @@ export async function addProductImage(
     })
     .select('id')
     .single()
-  if (error) return { ok: false, error: friendlyError(error, 'Upload failed. Please try again.') }
+  if (error) return { ok: false, error: err(error, 'errors.uploadFailed') }
   return { ok: true, data: { id: data.id } }
 }
 
 export async function reorderProductImages(productId: string, imageIds: string[]): Promise<ActionResult> {
-  if (!uuid.safeParse(productId).success || !z.array(uuid).max(12).safeParse(imageIds).success) return { ok: false, error: 'Unknown image.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(productId).success || !z.array(uuid).max(12).safeParse(imageIds).success) return { ok: false, error: t('errors.unknownItem') }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const results = await Promise.all(imageIds.map((id, position) => supabase.from('product_images').update({ position }).eq('id', id).eq('product_id', productId)))
   const failed = results.find((r) => r.error)
-  if (failed?.error) return { ok: false, error: friendlyError(failed.error) }
+  if (failed?.error) return { ok: false, error: err(failed.error) }
   return { ok: true }
 }
 
 export async function updateImageAlt(imageId: string, alt: string): Promise<ActionResult> {
-  if (!uuid.safeParse(imageId).success) return { ok: false, error: 'Unknown image.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(imageId).success) return { ok: false, error: t('errors.unknownItem') }
   const { supabase } = await seller()
   const { error } = await supabase.from('product_images').update({ alt: alt.trim().slice(0, 200) || null }).eq('id', imageId)
-  if (error) return { ok: false, error: friendlyError(error) }
+  if (error) return { ok: false, error: err(error) }
   return { ok: true }
 }
 
 export async function deleteProductImage(productId: string, imageId: string): Promise<ActionResult> {
-  if (!uuid.safeParse(productId).success || !uuid.safeParse(imageId).success) return { ok: false, error: 'Unknown image.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(productId).success || !uuid.safeParse(imageId).success) return { ok: false, error: t('errors.unknownItem') }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const { data: img } = await supabase.from('product_images').select('storage_path').eq('id', imageId).eq('product_id', productId).maybeSingle()
-  if (!img) return { ok: false, error: 'Image not found.' }
+  if (!img) return { ok: false, error: t('errors.unknownItem') }
   const { error, count } = await supabase.from('product_images').delete({ count: 'exact' }).eq('id', imageId)
-  if (error) return { ok: false, error: friendlyError(error) }
-  if (!count) return { ok: false, error: "You don't have permission to perform this action." }
+  if (error) return { ok: false, error: err(error) }
+  if (!count) return { ok: false, error: t('errors.forbidden') }
   await supabase.storage.from('product-images').remove([img.storage_path])
-  return { ok: true, message: 'Image deleted' }
+  return { ok: true, message: t('act.imageDeleted') }
 }
 
 const videosSchema = z.array(httpsUrl).max(4)
 
 export async function saveVideos(productId: string, urls: string[]): Promise<ActionResult> {
-  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(productId).success) return { ok: false, error: t('errors.unknownItem') }
   const parsed = videosSchema.safeParse(urls.map((u) => u.trim()).filter(Boolean))
-  if (!parsed.success) return { ok: false, error: 'Video links must be valid HTTPS URLs (YouTube or Vimeo work best).' }
+  if (!parsed.success) return { ok: false, error: t('v.videoUrl') }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const { error: delError } = await supabase.from('product_videos').delete().eq('product_id', productId)
-  if (delError) return { ok: false, error: friendlyError(delError) }
+  if (delError) return { ok: false, error: err(delError) }
   if (parsed.data.length) {
     const { error } = await supabase
       .from('product_videos')
       .insert(parsed.data.map((url, position) => ({ product_id: productId, url, provider: videoProvider(url), position })))
-    if (error) return { ok: false, error: friendlyError(error) }
+    if (error) return { ok: false, error: err(error) }
   }
-  return { ok: true, message: 'Saved' }
+  return { ok: true, message: t('act.saved') }
 }
 
 // ---------------------------------------------------------------------------
@@ -345,30 +358,31 @@ const featuresSchema = z.object({
 })
 
 export async function saveFeatures(productId: string, input: z.input<typeof featuresSchema>): Promise<ActionResult> {
-  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(productId).success) return { ok: false, error: t('errors.unknownItem') }
   const clean = {
     key_features: input.key_features.map((s) => s.trim()).filter(Boolean),
     benefits: input.benefits.map((s) => s.trim()).filter(Boolean),
     specs: input.specs.filter((s) => s.label.trim() && s.value.trim()),
   }
   const parsed = featuresSchema.safeParse(clean)
-  if (!parsed.success) return { ok: false, error: 'Each feature must be 2–160 characters; each specification needs a label and a value.' }
+  if (!parsed.success) return { ok: false, error: t('v.features') }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const { error, count } = await supabase
     .from('products')
     .update({ key_features: parsed.data.key_features, benefits: parsed.data.benefits }, { count: 'exact' })
     .eq('id', productId)
-  if (error) return { ok: false, error: friendlyError(error) }
-  if (!count) return { ok: false, error: 'This product can no longer be edited. It may be under review.' }
+  if (error) return { ok: false, error: err(error) }
+  if (!count) return { ok: false, error: t('errors.notEditable') }
   await supabase.from('product_specifications').delete().eq('product_id', productId)
   if (parsed.data.specs.length) {
     const { error: specError } = await supabase
       .from('product_specifications')
       .insert(parsed.data.specs.map((s, position) => ({ product_id: productId, ...s, position })))
-    if (specError) return { ok: false, error: friendlyError(specError) }
+    if (specError) return { ok: false, error: err(specError) }
   }
-  return { ok: true, message: 'Saved' }
+  return { ok: true, message: t('act.saved') }
 }
 
 // ---------------------------------------------------------------------------
@@ -387,13 +401,14 @@ const brandInfoSchema = z.object({
 })
 
 export async function saveBrandInfo(input: z.input<typeof brandInfoSchema>): Promise<ActionResult> {
+  const { t, err, fe } = await i18nAction()
   const parsed = brandInfoSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return { ok: false, error: t('errors.fixFields'), fieldErrors: fe(parsed.error.flatten().fieldErrors) }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const { brand_id, instagram, x, youtube, logo_url, ...rest } = parsed.data
   const base = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/brand-images/brands/${brand_id}/`
-  if (logo_url && !logo_url.startsWith(base)) return { ok: false, error: 'Logo upload failed. Please try again.' }
+  if (logo_url && !logo_url.startsWith(base)) return { ok: false, error: t('errors.logoUpload') }
   const { error, count } = await supabase
     .from('brands')
     .update(
@@ -401,10 +416,10 @@ export async function saveBrandInfo(input: z.input<typeof brandInfoSchema>): Pro
       { count: 'exact' },
     )
     .eq('id', brand_id)
-  if (error) return { ok: false, error: friendlyError(error) }
+  if (error) return { ok: false, error: err(error) }
   // Brands already approved by editors can only be edited by their owner.
-  if (!count) return { ok: false, error: "You can't edit this brand. Contact the editors to update brand details." }
-  return { ok: true, message: 'Saved' }
+  if (!count) return { ok: false, error: t('errors.brandNotEditable') }
+  return { ok: true, message: t('act.saved') }
 }
 
 // ---------------------------------------------------------------------------
@@ -412,55 +427,60 @@ export async function saveBrandInfo(input: z.input<typeof brandInfoSchema>): Pro
 // ---------------------------------------------------------------------------
 
 export async function submitForReview(productId: string): Promise<ActionResult<{ duplicates: { name: string; slug: string }[] }>> {
-  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(productId).success) return { ok: false, error: t('errors.unknownItem') }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const { data: sub } = await supabase.from('submissions').select('id').eq('product_id', productId).maybeSingle()
-  if (!sub) return { ok: false, error: 'Submission not found.' }
+  if (!sub) return { ok: false, error: t('errors.submissionNotFound') }
   const { error } = await supabase.rpc('transition_submission', { submission_id: sub.id, action: 'submit' })
-  if (error) return { ok: false, error: friendlyError(error, 'Something went wrong. Your draft has been saved.') }
+  if (error) return { ok: false, error: err(error, 'errors.draftSaved') }
   revalidatePath('/seller', 'layout')
-  return { ok: true, data: { duplicates: [] }, message: 'Submitted for review' }
+  return { ok: true, data: { duplicates: [] }, message: t('act.submitted') }
 }
 
 export async function checkDuplicates(productId: string): Promise<ActionResult<{ name: string; slug: string; reasons: string[] }[]>> {
-  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(productId).success) return { ok: false, error: t('errors.unknownItem') }
   const { supabase } = await seller()
   const { data, error } = await supabase.rpc('find_duplicate_products', { _product_id: productId })
-  if (error) return { ok: false, error: friendlyError(error) }
+  if (error) return { ok: false, error: err(error) }
   return { ok: true, data: (data ?? []).map((d) => ({ name: d.name, slug: d.slug, reasons: d.reasons })) }
 }
 
 export async function withdrawSubmission(submissionId: string): Promise<ActionResult> {
-  if (!uuid.safeParse(submissionId).success) return { ok: false, error: 'Unknown submission.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(submissionId).success) return { ok: false, error: t('errors.unknownItem') }
   const { supabase } = await seller()
   const { error } = await supabase.rpc('transition_submission', { submission_id: submissionId, action: 'withdraw' })
-  if (error) return { ok: false, error: friendlyError(error) }
+  if (error) return { ok: false, error: err(error) }
   revalidatePath('/seller', 'layout')
-  return { ok: true, message: 'Submission withdrawn. It is a draft again.' }
+  return { ok: true, message: t('act.withdrawn') }
 }
 
 export async function deleteDraft(productId: string): Promise<ActionResult> {
-  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { t, err } = await i18nAction()
+  if (!uuid.safeParse(productId).success) return { ok: false, error: t('errors.unknownItem') }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const { data: images } = await supabase.from('product_images').select('storage_path').eq('product_id', productId)
   const { error, count } = await supabase.from('products').delete({ count: 'exact' }).eq('id', productId)
-  if (error) return { ok: false, error: friendlyError(error) }
-  if (!count) return { ok: false, error: 'Only drafts can be deleted.' }
+  if (error) return { ok: false, error: err(error) }
+  if (!count) return { ok: false, error: t('errors.onlyDrafts') }
   if (images?.length) await supabase.storage.from('product-images').remove(images.map((i) => i.storage_path))
   revalidatePath('/seller', 'layout')
-  return { ok: true, message: 'Draft deleted' }
+  return { ok: true, message: t('act.draftDeleted') }
 }
 
 export async function sendSubmissionMessage(submissionId: string, body: string): Promise<ActionResult> {
-  const parsed = z.object({ id: uuid, body: z.string().trim().min(1, 'Write a message.').max(4000) }).safeParse({ id: submissionId, body })
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Write a message.' }
+  const { t, err } = await i18nAction()
+  const parsed = z.object({ id: uuid, body: z.string().trim().min(1, 'v.message').max(4000) }).safeParse({ id: submissionId, body })
+  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'v.message' }
   const { supabase, user } = await seller()
   if (!user) return { ok: false, error: LOGIN_REQUIRED }
   const { error } = await supabase.from('submission_messages').insert({ submission_id: submissionId, author_id: user.id, body: parsed.data.body })
-  if (error) return { ok: false, error: friendlyError(error) }
+  if (error) return { ok: false, error: err(error) }
   revalidatePath(`/seller/submissions/${submissionId}`)
   revalidatePath(`/admin/submissions/${submissionId}`)
-  return { ok: true, message: 'Message sent' }
+  return { ok: true, message: t('messages.sent') }
 }

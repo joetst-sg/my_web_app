@@ -1,13 +1,14 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useLocalizedRouter, useT } from '@/components/i18n/provider'
 import { useTransition } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { withdrawSubmission } from '@/lib/actions/seller'
 
 export function WithdrawButton({ submissionId }: { submissionId: string }) {
-  const router = useRouter()
+  const router = useLocalizedRouter()
+  const t = useT()
   const [pending, start] = useTransition()
   return (
     <Button
@@ -24,7 +25,7 @@ export function WithdrawButton({ submissionId }: { submissionId: string }) {
         })
       }
     >
-      Withdraw to edit
+      {t('seller.submission.withdraw')}
     </Button>
   )
 }

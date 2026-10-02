@@ -8,14 +8,16 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { FormMessage, SubmitButton } from '@/components/common/form-bits'
 import { setInterests, updatePreferences } from '@/lib/actions/account'
+import { useT } from '@/components/i18n/provider'
 
 export function PrefsForm({ prefs }: { prefs: Record<'email' | 'in_app' | 'product_updates' | 'deals', boolean> }) {
   const [state, action] = useActionState(updatePreferences, null)
+  const t = useT()
   const rows = [
-    ['in_app', 'In-app notifications', 'Reminders, price drops, followers and collection activity.'],
-    ['email', 'Email updates', 'Reminder and price-drop emails. Submission updates for sellers are always sent.'],
-    ['product_updates', 'Product updates', 'News about products you saved.'],
-    ['deals', 'Deals', 'Sales on products in your saved list and collections.'],
+    ['in_app', 'account.prefs.inApp', 'account.prefs.inAppHint'],
+    ['email', 'account.prefs.email', 'account.prefs.emailHint'],
+    ['product_updates', 'account.prefs.productUpdates', 'account.prefs.productUpdatesHint'],
+    ['deals', 'account.prefs.deals', 'account.prefs.dealsHint'],
   ] as const
   return (
     <form action={action} className="flex flex-col gap-4">
@@ -23,23 +25,24 @@ export function PrefsForm({ prefs }: { prefs: Record<'email' | 'in_app' | 'produ
       {rows.map(([name, label, hint]) => (
         <div key={name} className="flex items-start justify-between gap-6 rounded-xl border p-4">
           <div>
-            <Label htmlFor={`pref-${name}`}>{label}</Label>
-            <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+            <Label htmlFor={`pref-${name}`}>{t(label)}</Label>
+            <p className="mt-1 text-sm text-muted-foreground">{t(hint)}</p>
           </div>
           <Switch id={`pref-${name}`} name={name} defaultChecked={prefs[name]} />
         </div>
       ))}
-      <div><SubmitButton pendingLabel="Saving…">Save preferences</SubmitButton></div>
+      <div><SubmitButton pendingLabel={t('common.saving')}>{t('account.prefs.save')}</SubmitButton></div>
     </form>
   )
 }
 
 export function InterestsForm({ categories, selected }: { categories: { id: string; name: string }[]; selected: string[] }) {
   const [picked, setPicked] = useState(new Set(selected))
+  const t = useT()
   const [pending, start] = useTransition()
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Interests">
+      <div className="flex flex-wrap gap-2" role="group" aria-label={t('onboarding.interests')}>
         {categories.map((c) => {
           const on = picked.has(c.id)
           return (
@@ -67,12 +70,12 @@ export function InterestsForm({ categories, selected }: { categories: { id: stri
           onClick={() =>
             start(async () => {
               const res = await setInterests([...picked])
-              if (res.ok) toast.success('Interests saved')
+              if (res.ok) toast.success(t('act.interestsUpdated'))
               else toast.error(res.error)
             })
           }
         >
-          Save interests
+          {t('account.prefs.saveInterests')}
         </Button>
       </div>
     </div>

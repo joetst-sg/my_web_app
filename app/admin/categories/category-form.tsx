@@ -10,7 +10,10 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { saveCategory } from '@/lib/actions/admin'
 
-type Cat = { id?: string; name: string; slug: string; description: string | null; parent_id: string | null; color: string | null; icon: string | null; seo_title: string | null; seo_description: string | null; is_featured: boolean; sort_order: number }
+type Cat = { id?: string; name: string; slug: string; description: string | null; parent_id: string | null; color: string | null; icon: string | null; seo_title: string | null; seo_description: string | null; is_featured: boolean; sort_order: number; translations?: unknown }
+
+const zh = (row: { translations?: unknown } | undefined, field: string) =>
+  ((row?.translations as Record<string, Record<string, string>> | undefined)?.['zh-HK']?.[field] ?? '')
 
 export function CategoryForm({ category, parents, onDone }: { category?: Cat; parents: { id: string; name: string }[]; onDone?: () => void }) {
   const router = useRouter()
@@ -26,6 +29,8 @@ export function CategoryForm({ category, parents, onDone }: { category?: Cat; pa
     seo_description: category?.seo_description ?? '',
     is_featured: category?.is_featured ?? false,
     sort_order: String(category?.sort_order ?? 0),
+    zh_name: zh(category, 'name'),
+    zh_description: zh(category, 'description'),
   })
   const id = category?.id ?? 'new'
   return (
@@ -40,7 +45,7 @@ export function CategoryForm({ category, parents, onDone }: { category?: Cat; pa
             toast.success(res.message)
             router.refresh()
             onDone?.()
-            if (!category) setV({ ...v, name: '', slug: '', description: '' })
+            if (!category) setV({ ...v, name: '', slug: '', description: '', zh_name: '', zh_description: '' })
           }
         })
       }}
@@ -48,6 +53,8 @@ export function CategoryForm({ category, parents, onDone }: { category?: Cat; pa
       <div className="flex flex-col gap-1.5"><Label htmlFor={`c-name-${id}`}>Name</Label><Input id={`c-name-${id}`} required value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} /></div>
       <div className="flex flex-col gap-1.5"><Label htmlFor={`c-slug-${id}`}>Slug (auto if empty)</Label><Input id={`c-slug-${id}`} value={v.slug} onChange={(e) => setV({ ...v, slug: e.target.value })} /></div>
       <div className="flex flex-col gap-1.5 sm:col-span-2"><Label htmlFor={`c-desc-${id}`}>Description</Label><Input id={`c-desc-${id}`} value={v.description} onChange={(e) => setV({ ...v, description: e.target.value })} /></div>
+      <div className="flex flex-col gap-1.5"><Label htmlFor={`c-zhname-${id}`}>Name (繁體中文)</Label><Input id={`c-zhname-${id}`} lang="zh-HK" maxLength={60} value={v.zh_name} placeholder="Optional — English is shown if empty" onChange={(e) => setV({ ...v, zh_name: e.target.value })} /></div>
+      <div className="flex flex-col gap-1.5"><Label htmlFor={`c-zhdesc-${id}`}>Description (繁體中文)</Label><Input id={`c-zhdesc-${id}`} lang="zh-HK" maxLength={600} value={v.zh_description} onChange={(e) => setV({ ...v, zh_description: e.target.value })} /></div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={`c-parent-${id}`}>Parent category</Label>
         <Select value={v.parent_id || 'none'} onValueChange={(x) => setV({ ...v, parent_id: x === 'none' ? '' : x })}>

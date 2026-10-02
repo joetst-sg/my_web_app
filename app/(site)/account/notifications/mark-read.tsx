@@ -1,17 +1,19 @@
 'use client'
 
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { useTransition } from 'react'
 import { CheckCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { markNotificationsRead } from '@/lib/actions/account'
+import { useT } from '@/components/i18n/provider'
 
 export function MarkAllRead() {
   const [pending, start] = useTransition()
+  const t = useT()
   return (
     <Button variant="outline" disabled={pending} onClick={() => start(async () => void (await markNotificationsRead()))}>
       <CheckCheck />
-      Mark all as read
+      {t('account.notifications.markAll')}
     </Button>
   )
 }

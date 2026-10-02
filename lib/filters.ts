@@ -4,14 +4,14 @@ import { z } from 'zod'
 // e.g. /products?category=gaming&sort=trending&price_max=500
 
 export const sortOptions = [
-  { value: 'relevance', label: 'Most relevant' },
-  { value: 'newest', label: 'Newest' },
-  { value: 'trending', label: 'Trending' },
-  { value: 'most_saved', label: 'Most saved' },
-  { value: 'rating', label: 'Highest rated' },
-  { value: 'price_asc', label: 'Lowest price' },
-  { value: 'price_desc', label: 'Highest price' },
-  { value: 'discount', label: 'Biggest discount' },
+  { value: 'relevance', label: 'sort.relevance' },
+  { value: 'newest', label: 'sort.newest' },
+  { value: 'trending', label: 'sort.trending' },
+  { value: 'most_saved', label: 'sort.mostSaved' },
+  { value: 'rating', label: 'sort.rating' },
+  { value: 'price_asc', label: 'sort.priceAsc' },
+  { value: 'price_desc', label: 'sort.priceDesc' },
+  { value: 'discount', label: 'sort.discount' },
 ] as const
 
 const boolParam = z

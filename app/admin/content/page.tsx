@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: 'Homepage' }
 export default async function HomepageCmsPage() {
   const supabase = await createClient()
   const [{ data: sections }, { data: products }] = await Promise.all([
-    supabase.from('homepage_sections').select('id, type, title, subtitle, config, is_enabled, position').order('position'),
+    supabase.from('homepage_sections').select('id, type, title, subtitle, translations, config, is_enabled, position').order('position'),
     supabase.from('products').select('id, name').eq('status', 'published').order('name'),
   ])
   return (

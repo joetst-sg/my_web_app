@@ -1,21 +1,26 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { requireViewer } from '@/lib/auth'
+import { getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = { title: 'Seller settings', robots: { index: false } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('seller.settings.title'), robots: { index: false } }
+}
 
 export default async function SellerSettingsPage() {
   const viewer = await requireViewer('/seller/settings')
+  const t = await getT()
   return (
     <div className="max-w-2xl">
-      <h1 className="font-display text-3xl font-bold sm:text-4xl">Settings</h1>
-      <p className="mb-8 mt-1 text-muted-foreground">Account-wide settings are shared with your Loupe account.</p>
+      <h1 className="font-display text-3xl font-bold sm:text-4xl">{t('seller.nav.settings')}</h1>
+      <p className="mb-8 mt-1 text-muted-foreground">{t('seller.settings.intro')}</p>
       <ul className="divide-y rounded-2xl border">
         {[
-          ['/seller/profile', 'Seller profile', 'Company name, contact email and links editors see.'],
-          ['/account/preferences', 'Notifications', 'Submission updates (approved, changes requested, published) are always emailed to you.'],
-          ['/account/security', 'Password & email', `Signed in as ${viewer.email}.`],
-          ['/account/profile', 'Public profile', 'Your name and avatar on public collections.'],
+          ['/seller/profile', t('seller.nav.profile'), t('seller.settings.profileBody')],
+          ['/account/preferences', t('account.nav.notifications'), t('seller.settings.notificationsBody')],
+          ['/account/security', t('seller.settings.security'), t('account.security.signedInAs', { email: viewer.email ?? '' })],
+          ['/account/profile', t('seller.settings.publicProfile'), t('seller.settings.publicProfileBody')],
         ].map(([href, title, body]) => (
           <li key={href}>
             <Link href={href} className="block p-5 hover:bg-surface">
@@ -26,7 +31,7 @@ export default async function SellerSettingsPage() {
         ))}
       </ul>
       <p className="mt-6 text-sm text-muted-foreground">
-        Submission limit: 10 products per day. Contact the editors if you need to submit more for a launch.
+        {t('seller.settings.limit')}
       </p>
     </div>
   )

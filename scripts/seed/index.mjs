@@ -176,10 +176,11 @@ async function seedCatalogue() {
   // Categories (parents first)
   const parents = categories.filter((c) => !c.parent)
   const children = categories.filter((c) => c.parent)
-  await sql(`insert into public.categories (slug, name, description, color, icon, is_featured, sort_order, seo_title, seo_description) values
-    ${parents.map((c, i) => `(${lit(c.slug)}, ${lit(c.name)}, ${lit(c.description)}, ${lit(c.color)}, ${lit(c.icon)}, ${lit(!!c.featured)}, ${i}, ${lit(`${c.name} — new and trending products`)}, ${lit(c.description)})`).join(',\n')};`)
-  await sql(`insert into public.categories (slug, name, description, color, icon, parent_id, sort_order) values
-    ${children.map((c, i) => `(${lit(c.slug)}, ${lit(c.name)}, ${lit(c.description)}, ${lit(c.color)}, ${lit(c.icon)}, (select id from public.categories where slug = ${lit(c.parent)}), ${i})`).join(',\n')};`)
+  const tr = (c) => lit({ 'zh-HK': c.zh ? { name: c.zh.name, description: c.zh.description, seo_title: `${c.zh.name} — 最新及熱門產品`, seo_description: c.zh.description } : {} })
+  await sql(`insert into public.categories (slug, name, description, color, icon, is_featured, sort_order, seo_title, seo_description, translations) values
+    ${parents.map((c, i) => `(${lit(c.slug)}, ${lit(c.name)}, ${lit(c.description)}, ${lit(c.color)}, ${lit(c.icon)}, ${lit(!!c.featured)}, ${i}, ${lit(`${c.name} — new and trending products`)}, ${lit(c.description)}, ${tr(c)})`).join(',\n')};`)
+  await sql(`insert into public.categories (slug, name, description, color, icon, parent_id, sort_order, translations) values
+    ${children.map((c, i) => `(${lit(c.slug)}, ${lit(c.name)}, ${lit(c.description)}, ${lit(c.color)}, ${lit(c.icon)}, (select id from public.categories where slug = ${lit(c.parent)}), ${i}, ${tr(c)})`).join(',\n')};`)
   log(`${categories.length} categories`)
 
   // Brands
@@ -405,15 +406,15 @@ async function main() {
   log(`${articles.length} articles`)
 
   // Homepage sections (CMS-managed)
-  await sql(`insert into public.homepage_sections (type, title, subtitle, config, position) values
-    ('hero', null, null, '{}'::jsonb, 0),
-    ('featured_categories', 'Browse by category', 'Twelve places to start exploring.', '{"limit": 12}'::jsonb, 1),
-    ('trending_products', 'Trending this week', 'Ranked by saves, clicks and views over the last few days.', '{"limit": 8}'::jsonb, 2),
-    ('editors_picks', 'Editor''s picks', 'Products our team tested and loved.', '{"limit": 6}'::jsonb, 3),
-    ('new_products', 'Just published', 'Fresh from the review desk.', '{"limit": 8}'::jsonb, 4),
-    ('featured_collections', 'Curated collections', 'Hand-picked sets for specific needs.', '{"limit": 4}'::jsonb, 5),
-    ('deals', 'Deals worth knowing about', 'Verified price drops on products we cover.', '{"limit": 4}'::jsonb, 6),
-    ('magazine', 'From the magazine', 'Reviews, guides and interviews.', '{"limit": 3}'::jsonb, 7);`)
+  await sql(`insert into public.homepage_sections (type, title, subtitle, config, position, translations) values
+    ('hero', null, null, '{}'::jsonb, 0, '{}'::jsonb),
+    ('featured_categories', 'Browse by category', 'Twelve places to start exploring.', '{"limit": 12}'::jsonb, 1, '{"zh-HK": {"title": "按類別瀏覽", "subtitle": "十二個探索起點。"}}'::jsonb),
+    ('trending_products', 'Trending this week', 'Ranked by saves, clicks and views over the last few days.', '{"limit": 8}'::jsonb, 2, '{"zh-HK": {"title": "本週熱門", "subtitle": "根據最近幾天的收藏、點擊和瀏覽排名。"}}'::jsonb),
+    ('editors_picks', 'Editor''s picks', 'Products our team tested and loved.', '{"limit": 6}'::jsonb, 3, '{"zh-HK": {"title": "編輯精選", "subtitle": "我們團隊親身試用並喜愛的產品。"}}'::jsonb),
+    ('new_products', 'Just published', 'Fresh from the review desk.', '{"limit": 8}'::jsonb, 4, '{"zh-HK": {"title": "最新上架", "subtitle": "剛剛通過編輯審核。"}}'::jsonb),
+    ('featured_collections', 'Curated collections', 'Hand-picked sets for specific needs.', '{"limit": 4}'::jsonb, 5, '{"zh-HK": {"title": "精選合集", "subtitle": "為特定需要挑選的產品組合。"}}'::jsonb),
+    ('deals', 'Deals worth knowing about', 'Verified price drops on products we cover.', '{"limit": 4}'::jsonb, 6, '{"zh-HK": {"title": "值得留意的優惠", "subtitle": "我們介紹過的產品的已核實減價。"}}'::jsonb),
+    ('magazine', 'From the magazine', 'Reviews, guides and interviews.', '{"limit": 3}'::jsonb, 7, '{"zh-HK": {"title": "雜誌精選", "subtitle": "評測、指南及訪問。"}}'::jsonb);`)
   log('homepage sections')
 
   // Demo user activity: follows, saves, reminders

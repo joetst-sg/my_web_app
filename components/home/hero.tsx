@@ -1,14 +1,17 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { productImageUrl } from '@/lib/images'
+import { fromTranslations } from '@/lib/i18n/content'
+import { getI18n } from '@/lib/i18n/server'
 import type { ProductCardData } from '@/lib/db/products'
 import { BuyButton } from '@/components/product/buy-button'
 import { DiscountBadge, PriceDisplay, RatingBadge } from '@/components/product/price'
 import { SaveButton } from '@/components/product/save-button'
 
-export function Hero({ product: p, isSaved }: { product: ProductCardData; isSaved: boolean }) {
+export async function Hero({ product: p, isSaved }: { product: ProductCardData; isSaved: boolean }) {
+  const { t, locale } = await getI18n()
   const img = productImageUrl(p.image_path)
   return (
     <section aria-labelledby="hero-title" className="container-page pt-6 sm:pt-10">
@@ -28,10 +31,10 @@ export function Hero({ product: p, isSaved }: { product: ProductCardData; isSave
         </Link>
         <div className="flex flex-col justify-center gap-5 p-6 sm:p-10 lg:p-12">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="eyebrow">Featured today</span>
+            <span className="eyebrow">{t('home.featuredToday')}</span>
             {p.category_name && (
               <Link href={`/categories/${p.category_slug}`} className="rounded-full border bg-background px-2.5 py-0.5 text-xs font-medium hover:border-foreground/30">
-                {p.category_name}
+                {fromTranslations(p.category_translations, 'name', locale, p.category_name)}
               </Link>
             )}
           </div>
@@ -51,7 +54,7 @@ export function Hero({ product: p, isSaved }: { product: ProductCardData; isSave
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link href={`/products/${p.slug}`} className={cn(buttonVariants({ size: 'lg' }), 'h-11 rounded-full px-5 text-[0.95rem]')}>
-              Discover product
+              {t('home.discoverProduct')}
             </Link>
             <BuyButton productId={p.id!} className="bg-background text-foreground ring-1 ring-border hover:bg-muted" />
             <SaveButton productId={p.id!} productName={p.name ?? ''} initialSaved={isSaved} className="size-11" />

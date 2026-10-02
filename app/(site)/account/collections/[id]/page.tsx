@@ -4,8 +4,12 @@ import { requireViewer } from '@/lib/auth'
 import { productsByIds } from '@/lib/db/products'
 import { createClient } from '@/lib/supabase/server'
 import { CollectionEditor } from './collection-editor'
+import { getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = { title: 'Edit collection', robots: { index: false } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('account.collections.editTitle'), robots: { index: false } }
+}
 
 export default async function EditCollectionPage({ params }: PageProps<'/account/collections/[id]'>) {
   const { id } = await params

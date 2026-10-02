@@ -13,6 +13,7 @@ import { getViewer } from '@/lib/auth'
 import { withCollectionImages } from '@/lib/db/content'
 import { CARD_COLUMNS, parseFilters, type ProductCardData } from '@/lib/db/products'
 import { hueFor } from '@/lib/images'
+import { alternatesFor, getT } from '@/lib/i18n/server'
 import { createClient } from '@/lib/supabase/server'
 
 const getBrand = cache(async (slug: string) => {
@@ -27,12 +28,12 @@ const getBrand = cache(async (slug: string) => {
 
 export async function generateMetadata({ params }: PageProps<'/brands/[slug]'>): Promise<Metadata> {
   const { slug } = await params
-  const b = await getBrand(slug)
-  if (!b) return { title: 'Brand not found' }
+  const [b, t] = await Promise.all([getBrand(slug), getT()])
+  if (!b) return { title: t('pages.brand.notFound') }
   return {
-    title: `${b.name} products`,
+    title: t('pages.brand.metaTitle', { name: b.name }),
     description: b.tagline || b.description?.slice(0, 160) || undefined,
-    alternates: { canonical: `/brands/${b.slug}` },
+    alternates: await alternatesFor(`/brands/${b.slug}`),
   }
 }
 
@@ -42,7 +43,7 @@ export default async function BrandPage({ params, searchParams }: PageProps<'/br
   if (!brand) notFound()
   const filters = parseFilters(await searchParams)
   const supabase = await createClient()
-  const viewer = await getViewer()
+  const [viewer, t] = await Promise.all([getViewer(), getT()])
 
   const [{ data: latest }, following, { data: productRows }] = await Promise.all([
     supabase.from('product_cards').select(CARD_COLUMNS).eq('status', 'published').eq('brand_id', brand.id).order('published_at', { ascending: false }).limit(4),
@@ -81,17 +82,17 @@ export default async function BrandPage({ params, searchParams }: PageProps<'/br
             <div>
               <h1 className="flex items-center gap-2 font-display text-4xl font-bold">
                 {brand.name}
-                {brand.is_verified && <BadgeCheck className="size-6 text-[oklch(0.55_0.15_250)]" aria-label="Verified brand" />}
+                {brand.is_verified && <BadgeCheck className="size-6 text-[oklch(0.55_0.15_250)]" aria-label={t('common.verifiedBrand')} />}
               </h1>
               {brand.tagline && <p className="mt-1 text-lg text-muted-foreground">{brand.tagline}</p>}
-              <p className="mt-1 text-sm text-muted-foreground">{ids.length} products · {brand.follower_count} followers</p>
+              <p className="mt-1 text-sm text-muted-foreground">{t(ids.length === 1 ? 'common.productsOne' : 'common.productsMany', { count: ids.length })} · {t(brand.follower_count === 1 ? 'common.followersOne' : 'common.followersMany', { count: brand.follower_count })}</p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <FollowButton kind="brand" id={brand.id} name={brand.name} initialFollowing={following} />
             {brand.website_url && (
               <Button asChild variant="outline" size="lg">
-                <a href={brand.website_url} target="_blank" rel="noopener noreferrer nofollow"><Globe />Website</a>
+                <a href={brand.website_url} target="_blank" rel="noopener noreferrer nofollow"><Globe />{t('common.website')}</a>
               </Button>
             )}
             {socials.map(([network, url]) => (
@@ -106,17 +107,17 @@ export default async function BrandPage({ params, searchParams }: PageProps<'/br
         <div className="flex flex-col gap-16 py-12">
           {(latest ?? []).length > 0 && (
             <section>
-              <SectionHeader title="Latest from this brand" />
+              <SectionHeader title={t('pages.brand.latest')} />
               <ProductGrid products={(latest ?? []) as ProductCardData[]} priorityCount={4} />
             </section>
           )}
           <section>
-            <SectionHeader title="All products" />
+            <SectionHeader title={t('pages.products.title')} />
             <ProductListing filters={filters} fixed={{ brand: slug }} basePath={`/brands/${slug}`} defaultSort="newest" />
           </section>
           {collections.length > 0 && (
             <section>
-              <SectionHeader title="Featured in collections" />
+              <SectionHeader title={t('pages.brand.inCollections')} />
               <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
                 {collections.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
               </div>

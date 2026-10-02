@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { notFound } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { ProductDetailView } from '@/components/product/product-detail-view'
@@ -17,13 +17,18 @@ import { toProductView } from '@/lib/db/product-view'
 import { getEditableProduct, missingFields, wizardOptions } from '@/lib/db/seller'
 import type { ProductDetail } from '@/lib/db/products'
 import { createClient } from '@/lib/supabase/server'
+import { getI18n, getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = { title: 'Edit product', robots: { index: false } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('seller.edit.title'), robots: { index: false } }
+}
 
 export default async function EditProductPage({ params, searchParams }: PageProps<'/seller/products/[id]/edit'>) {
   const { id } = await params
   const sp = await searchParams
   const viewer = await requireViewer(`/seller/products/${id}/edit`)
+  const { t, locale } = await getI18n()
   const product = await getEditableProduct(id)
   if (!product) notFound()
   const step = Math.min(Math.max(Number(sp.step) || 1, 1), WIZARD_STEPS.length)
@@ -33,7 +38,7 @@ export default async function EditProductPage({ params, searchParams }: PageProp
   const header = (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <p className="eyebrow"><Link href="/seller/products" className="hover:text-foreground">Products</Link></p>
+        <p className="eyebrow"><Link href="/seller/products" className="hover:text-foreground">{t('seller.nav.products')}</Link></p>
         <h1 className="mt-1 font-display text-3xl font-bold">{product.name}</h1>
       </div>
       {product.submission && <SubmissionStatusBadge status={product.submission.status} />}
@@ -45,13 +50,13 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       <div>
         {header}
         <div className="rounded-2xl border bg-surface p-6">
-          <p className="font-medium">This product can&apos;t be edited right now.</p>
+          <p className="font-medium">{t('seller.edit.lockedTitle')}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Products are locked while editors review, schedule or publish them. If you need a change, send the editors a message on the submission page.
+            {t('seller.edit.lockedBody')}
           </p>
           <div className="mt-4 flex gap-2">
-            {product.submission && <Button asChild><Link href={`/seller/submissions/${product.submission.id}`}>Open submission</Link></Button>}
-            <Button asChild variant="outline"><Link href={`/seller/products/${product.id}`}>View product</Link></Button>
+            {product.submission && <Button asChild><Link href={`/seller/submissions/${product.submission.id}`}>{t('seller.edit.openSubmission')}</Link></Button>}
+            <Button asChild variant="outline"><Link href={`/seller/products/${product.id}`}>{t('seller.edit.viewProduct')}</Link></Button>
           </div>
         </div>
       </div>
@@ -61,7 +66,7 @@ export default async function EditProductPage({ params, searchParams }: PageProp
   const reachable = WIZARD_STEPS.length
   let body: React.ReactNode
   if (step === 1) {
-    const options = await wizardOptions(viewer.id)
+    const options = await wizardOptions(viewer.id, locale)
     const primary = product.categories?.find((c) => c.is_primary)?.category
     const secondary = product.categories?.find((c) => !c.is_primary)?.category
     // Include the product's current brand if the seller doesn't own it.
@@ -113,10 +118,10 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       />
     )
   } else {
-    const view = toProductView(product as unknown as ProductDetail)
+    const view = toProductView(product as unknown as ProductDetail, locale)
     body = (
       <div className="flex flex-col gap-6">
-        <p className="text-muted-foreground">This is exactly how your product page will look once it&apos;s published. Buttons are disabled in the preview.</p>
+        <p className="text-muted-foreground">{t('seller.edit.previewIntro')}</p>
         <div className="rounded-3xl border p-4 sm:p-8">
           <ProductDetailView product={view} preview />
         </div>
@@ -130,7 +135,7 @@ export default async function EditProductPage({ params, searchParams }: PageProp
       {header}
       {product.status === 'changes_requested' && product.submission && (
         <p role="status" className="mb-6 rounded-xl bg-[oklch(0.96_0.05_80)] px-4 py-3 text-sm">
-          Editors asked for changes. <Link href={`/seller/submissions/${product.submission.id}`} className="font-medium underline">Read their message</Link>, update your product, then resubmit from the last step.
+          {t('seller.edit.changesBefore')}<Link href={`/seller/submissions/${product.submission.id}`} className="font-medium underline">{t('seller.edit.readMessage')}</Link>{t('seller.edit.changesAfter')}
         </p>
       )}
       <WizardProgress current={step} productId={product.id} reachable={reachable} />

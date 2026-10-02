@@ -1,8 +1,9 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import Link from '@/components/i18n/link'
+import { useLocalizedRouter, useT } from '@/components/i18n/provider'
+import { usePathname } from '@/components/i18n/use-pathname'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Trash2 } from 'lucide-react'
@@ -12,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { PriceDisplay } from '@/components/product/price'
 import { listMyCollections, setInCollection, toggleSave } from '@/lib/actions/engagement'
 import { productImageUrl } from '@/lib/images'
+import { useLocale } from '@/components/i18n/provider'
+import { fromTranslations } from '@/lib/i18n/content'
 import type { ProductCardData } from '@/lib/db/products'
 
 export function SavedList({
@@ -25,7 +28,9 @@ export function SavedList({
   sort: string
   category?: string
 }) {
-  const router = useRouter()
+  const router = useLocalizedRouter()
+  const t = useT()
+  const locale = useLocale()
   const pathname = usePathname()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [collections, setCollections] = useState<{ id: string; title: string }[] | null>(null)
@@ -42,7 +47,7 @@ export function SavedList({
       const results = await Promise.all(ids.map((id) => toggleSave(id, false)))
       const failed = results.find((r) => !r.ok)
       if (failed && !failed.ok) toast.error(failed.error)
-      else toast.success(ids.length === 1 ? 'Removed from saved' : `Removed ${ids.length} products`)
+      else toast.success(ids.length === 1 ? t('act.unsaved') : t('account.saved.removedMany', { count: ids.length }))
       setSelected(new Set())
       router.refresh()
     })
@@ -66,7 +71,7 @@ export function SavedList({
         return
       }
       const title = collections?.find((c) => c.id === collectionId)?.title
-      toast.success(`Added ${ids.length} product${ids.length === 1 ? '' : 's'} to “${title}”`)
+      toast.success(t(ids.length === 1 ? 'account.saved.movedOne' : 'account.saved.movedMany', { count: ids.length, title: title ?? '' }))
       setSelected(new Set())
     })
   }
@@ -75,38 +80,38 @@ export function SavedList({
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center gap-2">
         <Select value={category ?? 'all'} onValueChange={(v) => nav({ category: v === 'all' ? undefined : v })}>
-          <SelectTrigger className="h-10 w-48" aria-label="Filter by category"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 w-48" aria-label={t('account.saved.filterCategory')}><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All categories</SelectItem>
+            <SelectItem value="all">{t('account.saved.allCategories')}</SelectItem>
             {categories.map(([slug, name]) => <SelectItem key={slug} value={slug}>{name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={sort} onValueChange={(v) => nav({ sort: v === 'recent' ? undefined : v })}>
-          <SelectTrigger className="h-10 w-44" aria-label="Sort"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 w-44" aria-label={t('account.saved.sort')}><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="recent">Recently saved</SelectItem>
-            <SelectItem value="name">Name</SelectItem>
-            <SelectItem value="price_asc">Lowest price</SelectItem>
-            <SelectItem value="price_desc">Highest price</SelectItem>
+            <SelectItem value="recent">{t('account.saved.sortRecent')}</SelectItem>
+            <SelectItem value="name">{t('account.saved.sortName')}</SelectItem>
+            <SelectItem value="price_asc">{t('account.saved.sortLow')}</SelectItem>
+            <SelectItem value="price_desc">{t('account.saved.sortHigh')}</SelectItem>
           </SelectContent>
         </Select>
         {selected.size > 0 && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <span className="text-sm text-muted-foreground">{selected.size} selected</span>
+            <span className="text-sm text-muted-foreground">{t('account.saved.selected', { count: selected.size })}</span>
             <Select onOpenChange={(o) => o && loadCollections()} onValueChange={moveTo}>
-              <SelectTrigger className="h-10 w-52" aria-label="Move to collection"><SelectValue placeholder="Move to collection…" /></SelectTrigger>
+              <SelectTrigger className="h-10 w-52" aria-label={t('account.saved.moveTo')}><SelectValue placeholder={t('account.saved.moveToPlaceholder')} /></SelectTrigger>
               <SelectContent>
                 {collections === null ? (
-                  <SelectItem value="loading" disabled>Loading…</SelectItem>
+                  <SelectItem value="loading" disabled>{t('common.loading')}</SelectItem>
                 ) : collections.length === 0 ? (
-                  <SelectItem value="none" disabled>Create a collection first</SelectItem>
+                  <SelectItem value="none" disabled>{t('account.saved.createFirst')}</SelectItem>
                 ) : (
                   collections.map((c) => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)
                 )}
               </SelectContent>
             </Select>
             <Button variant="destructive" className="h-10" disabled={pending} onClick={() => remove([...selected])}>
-              <Trash2 />Remove
+              <Trash2 />{t('common.remove')}
             </Button>
           </div>
         )}
@@ -115,7 +120,7 @@ export function SavedList({
         {products.map((p) => (
           <li key={p.id} className="flex items-center gap-4 p-3 sm:p-4">
             <Checkbox
-              aria-label={`Select ${p.name}`}
+              aria-label={t('account.saved.select', { name: p.name ?? '' })}
               checked={selected.has(p.id!)}
               onCheckedChange={(v) => {
                 const next = new Set(selected)
@@ -128,11 +133,11 @@ export function SavedList({
               <Image src={productImageUrl(p.image_path)!} alt="" width={160} height={120} className="aspect-[4/3] w-20 rounded-lg object-cover sm:w-28" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-muted-foreground">{p.brand_name} · {p.category_name}</p>
+              <p className="text-xs text-muted-foreground">{p.brand_name} · {fromTranslations(p.category_translations, 'name', locale, p.category_name)}</p>
               <Link href={`/products/${p.slug}`} className="font-semibold hover:underline">{p.name}</Link>
               <div><PriceDisplay price={p.price} originalPrice={p.compare_at_price} currency={p.currency} size="sm" /></div>
             </div>
-            <Button variant="ghost" size="icon-lg" aria-label={`Remove ${p.name} from saved`} disabled={pending} onClick={() => remove([p.id!])}>
+            <Button variant="ghost" size="icon-lg" aria-label={t('account.saved.removeOne', { name: p.name ?? '' })} disabled={pending} onClick={() => remove([p.id!])}>
               <Trash2 />
             </Button>
           </li>

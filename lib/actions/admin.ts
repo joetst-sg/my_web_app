@@ -6,6 +6,14 @@ import { createClient } from '@/lib/supabase/server'
 import { friendlyError, type ActionResult } from '@/lib/errors'
 import { randomSuffix, slugify } from '@/lib/format'
 import { optionalHttpsUrl } from '@/lib/validation'
+import { en } from '@/lib/i18n/dictionaries/en'
+import { createTranslator, type MessageKey } from '@/lib/i18n/translate'
+
+// The admin area is English-only; shared validators return dictionary keys ("v.*").
+const enT = createTranslator('en', en, en)
+const msg = (m: string | undefined) => (m?.startsWith('v.') ? enT(m as MessageKey) : m)
+const fieldMsgs = (fe: Record<string, string[] | undefined>) =>
+  Object.fromEntries(Object.entries(fe).map(([k, v]) => [k, v?.map((m) => msg(m) ?? m)]))
 
 const uuid = z.string().uuid()
 const FORBIDDEN = "You don't have permission to perform this action."
@@ -95,7 +103,7 @@ const productEditSchema = z.object({
 export async function updateProductAdmin(productId: string, input: z.input<typeof productEditSchema>): Promise<ActionResult> {
   if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
   const parsed = productEditSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors: fieldMsgs(parsed.error.flatten().fieldErrors) }
   const { supabase, ok } = await staff()
   if (!ok) return { ok: false, error: FORBIDDEN }
   const { category_id, ...fields } = parsed.data
@@ -190,7 +198,7 @@ const dealSchema = z
 
 export async function createDeal(input: z.input<typeof dealSchema>): Promise<ActionResult> {
   const parsed = dealSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Please check the deal.' }
+  if (!parsed.success) return { ok: false, error: msg(parsed.error.issues[0]?.message) ?? 'Please check the deal.' }
   const { supabase, ok } = await staff()
   if (!ok) return { ok: false, error: FORBIDDEN }
   const d = parsed.data
@@ -253,15 +261,25 @@ const categorySchema = z.object({
   seo_description: z.string().trim().max(170).optional().transform((v) => v || null),
   is_featured: z.boolean().optional(),
   sort_order: z.coerce.number().int().min(0).max(1000).optional(),
+  zh_name: z.string().trim().max(60).optional(),
+  zh_description: z.string().trim().max(600).optional(),
 })
+
+// Traditional Chinese (Hong Kong) copy lives in the translations column.
+// Undefined leaves it untouched; empty strings are dropped (English is shown).
+function zhTranslations(fields: Record<string, string | undefined>) {
+  if (Object.values(fields).every((v) => v === undefined)) return undefined
+  return { 'zh-HK': Object.fromEntries(Object.entries(fields).filter(([, v]) => v)) }
+}
 
 export async function saveCategory(input: z.input<typeof categorySchema>): Promise<ActionResult> {
   const parsed = categorySchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Please check the form.' }
+  if (!parsed.success) return { ok: false, error: msg(parsed.error.issues[0]?.message) ?? 'Please check the form.' }
   const { supabase, ok } = await staff()
   if (!ok) return { ok: false, error: FORBIDDEN }
-  const { id, slug, ...rest } = parsed.data
-  const row = { ...rest, slug: slug || slugify(rest.name) }
+  const { id, slug, zh_name, zh_description, ...rest } = parsed.data
+  const translations = zhTranslations({ name: zh_name, description: zh_description })
+  const row = { ...rest, slug: slug || slugify(rest.name), ...(translations && { translations }) }
   const { error } = id ? await supabase.from('categories').update(row).eq('id', id) : await supabase.from('categories').insert(row)
   if (error) return { ok: false, error: error.code === '23505' ? 'A category with that slug already exists.' : friendlyError(error) }
   return done(['/admin/categories', '/categories', '/'], id ? 'Category saved' : 'Category created')
@@ -331,7 +349,7 @@ const articleSchema = z.object({
 
 export async function saveArticle(input: z.input<typeof articleSchema>): Promise<ActionResult<{ id: string }>> {
   const parsed = articleSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? 'Please check the article.', fieldErrors: parsed.error.flatten().fieldErrors }
+  if (!parsed.success) return { ok: false, error: msg(parsed.error.issues[0]?.message) ?? 'Please check the article.', fieldErrors: fieldMsgs(parsed.error.flatten().fieldErrors) }
   const { supabase, ok } = await staff()
   if (!ok) return { ok: false, error: FORBIDDEN }
   const { id, slug, category_ids, product_ids, ...rest } = parsed.data
@@ -389,6 +407,8 @@ const sectionSchema = z.object({
   limit: z.coerce.number().int().min(1).max(24).optional(),
   product_ids: z.array(uuid).max(24).optional(),
   is_enabled: z.boolean().default(true),
+  zh_title: z.string().trim().max(80).optional(),
+  zh_subtitle: z.string().trim().max(200).optional(),
 })
 
 export async function saveHomepageSection(input: z.input<typeof sectionSchema>): Promise<ActionResult> {
@@ -396,7 +416,9 @@ export async function saveHomepageSection(input: z.input<typeof sectionSchema>):
   if (!parsed.success) return { ok: false, error: 'Please check the section.' }
   const { supabase, ok, userId } = await staff()
   if (!ok) return { ok: false, error: FORBIDDEN }
-  const { id, limit, product_ids, ...rest } = parsed.data
+  const { id, limit, product_ids, zh_title, zh_subtitle, ...fields } = parsed.data
+  const translations = zhTranslations({ title: zh_title, subtitle: zh_subtitle })
+  const rest = { ...fields, ...(translations && { translations }) }
   const config = { ...(limit && { limit }), ...(product_ids && { product_ids }) }
   if (id) {
     const { error } = await supabase.from('homepage_sections').update({ ...rest, config, updated_by: userId, updated_at: new Date().toISOString() }).eq('id', id)

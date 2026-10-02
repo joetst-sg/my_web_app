@@ -1,7 +1,7 @@
 'use client'
 
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useLocalizedRouter, useT } from '@/components/i18n/provider'
 import { useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Progress } from '@/components/ui/progress'
 import { addProductImage, deleteProductImage, reorderProductImages, saveVideos, updateImageAlt } from '@/lib/actions/seller'
 import { productImageUrl } from '@/lib/images'
-import { prepareImage, uploadWithProgress, UploadError } from '@/lib/upload'
+import { prepareImage, uploadWithProgress, uploadErrorText, UploadError } from '@/lib/upload'
 import { StepActions } from './wizard-shared'
 
 type Img = { id: string; path: string; alt: string | null; src: string }
@@ -35,22 +35,23 @@ function Thumb({ img, index, onDelete, onReplace, onAlt, onPrimary, busy }: {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: img.id })
   const replaceInput = useRef<HTMLInputElement>(null)
   const [alt, setAlt] = useState(img.alt ?? '')
+  const t = useT()
   return (
     <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={cn('flex flex-col gap-2 rounded-2xl border bg-background p-2', isDragging && 'z-10 shadow-xl')}>
       <div className="relative overflow-hidden rounded-xl bg-muted">
-        <Image src={img.src} alt={alt || `Product image ${index + 1}`} width={600} height={450} sizes="240px" className="aspect-[4/3] w-full object-cover" />
-        {index === 0 && <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-highlight px-2 py-0.5 text-xs font-semibold text-highlight-foreground"><Star className="size-3 fill-current" />Primary</span>}
-        <button type="button" {...attributes} {...listeners} aria-label={`Drag to reorder image ${index + 1}. Use space and arrow keys.`} className="absolute right-2 top-2 cursor-grab rounded-lg bg-background/90 p-1.5 active:cursor-grabbing">
+        <Image src={img.src} alt={alt || t('seller.media.imageN', { n: index + 1 })} width={600} height={450} sizes="240px" className="aspect-[4/3] w-full object-cover" />
+        {index === 0 && <span className="absolute left-2 top-2 flex items-center gap-1 rounded-full bg-highlight px-2 py-0.5 text-xs font-semibold text-highlight-foreground"><Star className="size-3 fill-current" />{t('seller.media.primary')}</span>}
+        <button type="button" {...attributes} {...listeners} aria-label={t('seller.media.drag', { n: index + 1 })} className="absolute right-2 top-2 cursor-grab rounded-lg bg-background/90 p-1.5 active:cursor-grabbing">
           <GripVertical className="size-4" />
         </button>
       </div>
-      <Label htmlFor={`alt-${img.id}`} className="sr-only">Alt text for image {index + 1}</Label>
-      <Input id={`alt-${img.id}`} placeholder="Describe the image (alt text)" value={alt} onChange={(e) => setAlt(e.target.value)} onBlur={() => alt !== (img.alt ?? '') && onAlt(alt)} maxLength={200} className="h-9 text-sm" />
+      <Label htmlFor={`alt-${img.id}`} className="sr-only">{t('seller.media.altFor', { n: index + 1 })}</Label>
+      <Input id={`alt-${img.id}`} placeholder={t('seller.media.altPlaceholder')} value={alt} onChange={(e) => setAlt(e.target.value)} onBlur={() => alt !== (img.alt ?? '') && onAlt(alt)} maxLength={200} className="h-9 text-sm" />
       <div className="flex flex-wrap gap-1">
-        {index !== 0 && <Button type="button" variant="ghost" size="sm" onClick={onPrimary} disabled={busy}><Star />Make primary</Button>}
+        {index !== 0 && <Button type="button" variant="ghost" size="sm" onClick={onPrimary} disabled={busy}><Star />{t('seller.media.makePrimary')}</Button>}
         <input ref={replaceInput} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(e) => e.target.files?.[0] && onReplace(e.target.files[0])} tabIndex={-1} />
-        <Button type="button" variant="ghost" size="sm" onClick={() => replaceInput.current?.click()} disabled={busy}><RefreshCw />Replace</Button>
-        <Button type="button" variant="ghost" size="sm" onClick={onDelete} disabled={busy} className="text-destructive"><Trash2 />Delete</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={() => replaceInput.current?.click()} disabled={busy}><RefreshCw />{t('seller.media.replace')}</Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onDelete} disabled={busy} className="text-destructive"><Trash2 />{t('common.delete')}</Button>
       </div>
     </li>
   )
@@ -68,7 +69,8 @@ export function MediaManager({
   // 'standalone' is used on the admin product page: no wizard navigation.
   mode?: 'wizard' | 'standalone'
 }) {
-  const router = useRouter()
+  const router = useLocalizedRouter()
+  const t = useT()
   const input = useRef<HTMLInputElement>(null)
   const [images, setImages] = useState<Img[]>(initialImages.map((i) => ({ id: i.id, path: i.storage_path, alt: i.alt, src: productImageUrl(i.storage_path)! })))
   const [uploads, setUploads] = useState<Uploading[]>([])
@@ -93,7 +95,7 @@ export function MediaManager({
       if (replaceAt === undefined) setImages((cur) => [...cur, img])
       return img
     } catch (e) {
-      update({ error: e instanceof UploadError ? e.message : 'Upload failed. Please try again.' })
+      update({ error: uploadErrorText(e, t) })
       return null
     }
   }
@@ -101,7 +103,7 @@ export function MediaManager({
   async function addFiles(files: FileList | File[]) {
     const list = Array.from(files)
     const room = MAX - images.length - uploads.filter((u) => !u.error).length
-    if (list.length > room) toast.error(`You can add ${room} more image${room === 1 ? '' : 's'} (${MAX} maximum).`)
+    if (list.length > room) toast.error(t('seller.media.roomLeft', { room: Math.max(room, 0), max: MAX }))
     // Upload in sequence so the order matches the selection.
     for (const f of list.slice(0, Math.max(room, 0))) await uploadOne(f)
     router.refresh()
@@ -128,7 +130,7 @@ export function MediaManager({
         return
       }
       setImages((cur) => cur.filter((i) => i.id !== img.id))
-      toast.success('Image deleted')
+      toast.success(t('act.imageDeleted'))
     })
   }
 
@@ -141,7 +143,7 @@ export function MediaManager({
     const del = await deleteProductImage(productId, img.id)
     if (!del.ok) toast.error(del.error)
     persistOrder(next)
-    toast.success('Image replaced')
+    toast.success(t('seller.media.replaced'))
   }
 
   function saveAll(andContinue: boolean) {
@@ -151,8 +153,8 @@ export function MediaManager({
         toast.error(res.error)
         return
       }
-      if (images.length === 0 && andContinue) toast.warning('Add at least one image before you submit.')
-      else toast.success('Media saved')
+      if (images.length === 0 && andContinue) toast.warning(t('seller.media.addOne'))
+      else toast.success(t('seller.media.saved'))
       if (andContinue) router.push(`/seller/products/${productId}/edit?step=4`)
       router.refresh()
     })
@@ -168,11 +170,11 @@ export function MediaManager({
         className={cn('flex flex-col items-center justify-center gap-3 rounded-3xl border-2 border-dashed px-6 py-12 text-center transition-colors', dragOver ? 'border-foreground bg-surface' : 'border-border')}
       >
         <ImagePlus className="size-8 text-muted-foreground" aria-hidden />
-        <p className="font-medium">Drop images here</p>
-        <p className="text-sm text-muted-foreground">or</p>
+        <p className="font-medium">{t('seller.media.drop')}</p>
+        <p className="text-sm text-muted-foreground">{t('seller.media.or')}</p>
         <input ref={input} id="files" type="file" multiple accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" onChange={(e) => { if (e.target.files?.length) void addFiles(e.target.files); e.target.value = '' }} />
-        <Button type="button" variant="outline" size="lg" onClick={() => input.current?.click()} disabled={images.length >= MAX}>Browse files</Button>
-        <p className="text-xs text-muted-foreground">JPG, PNG, WebP or AVIF · at least 600×400 · up to 15 MB each · {images.length}/{MAX} images. We convert everything to optimized WebP (JPEG in Safari).</p>
+        <Button type="button" variant="outline" size="lg" onClick={() => input.current?.click()} disabled={images.length >= MAX}>{t('seller.media.browse')}</Button>
+        <p className="text-xs text-muted-foreground">{t('seller.media.rules', { count: images.length, max: MAX })}</p>
       </div>
 
       {uploads.length > 0 && (
@@ -182,9 +184,9 @@ export function MediaManager({
               {u.preview ? <Image src={u.preview} alt="" width={64} height={48} unoptimized className="h-12 w-16 rounded-md object-cover" /> : <div className="h-12 w-16 rounded-md bg-muted" />}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{u.name}</p>
-                {u.error ? <p role="alert" className="text-sm text-destructive">{u.error}</p> : <Progress value={u.progress * 100} aria-label={`Uploading ${u.name}`} className="mt-1.5" />}
+                {u.error ? <p role="alert" className="text-sm text-destructive">{u.error}</p> : <Progress value={u.progress * 100} aria-label={t('seller.media.uploading', { name: u.name })} className="mt-1.5" />}
               </div>
-              {u.error && <Button type="button" variant="ghost" size="icon" aria-label="Dismiss" onClick={() => setUploads((x) => x.filter((y) => y.key !== u.key))}><X /></Button>}
+              {u.error && <Button type="button" variant="ghost" size="icon" aria-label={t('seller.media.dismiss')} onClick={() => setUploads((x) => x.filter((y) => y.key !== u.key))}><X /></Button>}
             </li>
           ))}
         </ul>
@@ -192,8 +194,8 @@ export function MediaManager({
 
       {images.length > 0 && (
         <section aria-labelledby="images-h">
-          <h2 id="images-h" className="mb-1 font-sans text-base font-semibold tracking-normal">Your images</h2>
-          <p className="mb-4 text-sm text-muted-foreground">The first image is the primary image on cards and search. Drag to reorder.</p>
+          <h2 id="images-h" className="mb-1 font-sans text-base font-semibold tracking-normal">{t('seller.media.yourImages')}</h2>
+          <p className="mb-4 text-sm text-muted-foreground">{t('seller.media.firstPrimary')}</p>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={images.map((i) => i.id)} strategy={rectSortingStrategy}>
               <ul className="grid grid-cols-2 gap-3 md:grid-cols-3">
@@ -216,24 +218,24 @@ export function MediaManager({
       )}
 
       <section aria-labelledby="video-h" className="flex flex-col gap-3">
-        <h2 id="video-h" className="font-sans text-base font-semibold tracking-normal">Product video (optional)</h2>
+        <h2 id="video-h" className="font-sans text-base font-semibold tracking-normal">{t('seller.media.video')} {t('common.optional')}</h2>
         {videos.map((url, i) => (
           <div key={i} className="flex gap-2">
-            <Label htmlFor={`video-${i}`} className="sr-only">Video URL {i + 1}</Label>
+            <Label htmlFor={`video-${i}`} className="sr-only">{t('seller.media.videoUrl', { n: i + 1 })}</Label>
             <Input id={`video-${i}`} type="url" placeholder="https://www.youtube.com/watch?v=…" value={url} onChange={(e) => setVideos((v) => v.map((x, j) => (j === i ? e.target.value : x)))} className="h-11" />
-            {videos.length > 1 && <Button type="button" variant="ghost" size="icon-lg" aria-label="Remove video" onClick={() => setVideos((v) => v.filter((_, j) => j !== i))}><X /></Button>}
+            {videos.length > 1 && <Button type="button" variant="ghost" size="icon-lg" aria-label={t('seller.media.removeVideo')} onClick={() => setVideos((v) => v.filter((_, j) => j !== i))}><X /></Button>}
           </div>
         ))}
-        {videos.length < 4 && <Button type="button" variant="ghost" className="self-start" onClick={() => setVideos((v) => [...v, ''])}><Plus />Add another video</Button>}
-        <p className="text-xs text-muted-foreground">YouTube and Vimeo links are embedded on your product page.</p>
+        {videos.length < 4 && <Button type="button" variant="ghost" className="self-start" onClick={() => setVideos((v) => [...v, ''])}><Plus />{t('seller.media.addVideo')}</Button>}
+        <p className="text-xs text-muted-foreground">{t('seller.media.videoHint')}</p>
       </section>
 
       {mode === 'wizard' ? (
         <StepActions pending={busy} onSave={() => saveAll(false)} onContinue={() => saveAll(true)} backHref={`/seller/products/${productId}/edit?step=2`} />
       ) : (
         <div className="flex items-center gap-3">
-          <Button type="button" variant="outline" onClick={() => saveAll(false)} disabled={busy}>Save video links</Button>
-          <span className="text-xs text-muted-foreground">Images save automatically as you upload, reorder or delete them.</span>
+          <Button type="button" variant="outline" onClick={() => saveAll(false)} disabled={busy}>{t('seller.media.saveVideos')}</Button>
+          <span className="text-xs text-muted-foreground">{t('seller.media.autoSave')}</span>
         </div>
       )}
     </div>

@@ -1,19 +1,22 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { BadgeCheck, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatDate, labels } from '@/lib/format'
+import { localized } from '@/lib/i18n/content'
+import { getI18n } from '@/lib/i18n/server'
+import type { MessageKey } from '@/lib/i18n/translate'
 import { productImageUrl } from '@/lib/images'
 import { BrandMark } from './basics'
 import { CategoryIcon } from './category-icon'
 
-export function CategoryCard({
+export async function CategoryCard({
   category,
   className,
 }: {
-  category: { slug: string; name: string; color: string | null; icon: string | null; description?: string | null }
+  category: { slug: string; name: string; color: string | null; icon: string | null; description?: string | null; translations?: unknown }
   className?: string
 }) {
+  const { locale } = await getI18n()
   const color = category.color ?? '#475467'
   return (
     <Link
@@ -27,14 +30,14 @@ export function CategoryCard({
         <CategoryIcon name={category.icon} className="size-5" />
       </span>
       <span>
-        <span className="block font-semibold">{category.name}</span>
-        {category.description && <span className="mt-1 line-clamp-2 block text-sm text-muted-foreground">{category.description}</span>}
+        <span className="block font-semibold">{localized(category, 'name', locale)}</span>
+        {category.description && <span className="mt-1 line-clamp-2 block text-sm text-muted-foreground">{localized(category, 'description', locale)}</span>}
       </span>
     </Link>
   )
 }
 
-export function BrandCard({
+export async function BrandCard({
   brand,
   productCount,
   className,
@@ -43,6 +46,7 @@ export function BrandCard({
   productCount?: number
   className?: string
 }) {
+  const { t } = await getI18n()
   return (
     <Link
       href={`/brands/${brand.slug}`}
@@ -52,19 +56,19 @@ export function BrandCard({
       <span className="min-w-0">
         <span className="flex items-center gap-1 font-semibold">
           <span className="truncate">{brand.name}</span>
-          {brand.is_verified && <BadgeCheck className="size-4 shrink-0 text-[oklch(0.55_0.15_250)]" aria-label="Verified brand" />}
+          {brand.is_verified && <BadgeCheck className="size-4 shrink-0 text-[oklch(0.55_0.15_250)]" aria-label={t('common.verifiedBrand')} />}
         </span>
         {brand.tagline && <span className="line-clamp-1 block text-sm text-muted-foreground">{brand.tagline}</span>}
         <span className="mt-1 block text-xs text-muted-foreground">
-          {productCount !== undefined && `${productCount} product${productCount === 1 ? '' : 's'} · `}
-          {brand.follower_count} follower{brand.follower_count === 1 ? '' : 's'}
+          {productCount !== undefined && `${t(productCount === 1 ? 'common.productsOne' : 'common.productsMany', { count: productCount })} · `}
+          {t(brand.follower_count === 1 ? 'common.followersOne' : 'common.followersMany', { count: brand.follower_count })}
         </span>
       </span>
     </Link>
   )
 }
 
-export function CollectionCard({
+export async function CollectionCard({
   collection,
   images,
   ownerName,
@@ -75,6 +79,7 @@ export function CollectionCard({
   ownerName?: string | null
   className?: string
 }) {
+  const { t } = await getI18n()
   const tiles = [...images.filter(Boolean), null, null, null, null].slice(0, 4)
   return (
     <Link href={`/collections/${collection.slug}`} className={cn('group flex flex-col gap-3', className)}>
@@ -97,17 +102,17 @@ export function CollectionCard({
       </div>
       <div>
         <p className="eyebrow flex items-center gap-1.5">
-          {collection.is_editorial ? 'Editorial collection' : ownerName ? `By ${ownerName}` : 'Collection'}
-          {collection.visibility === 'private' && <Lock className="size-3" aria-label="Private" />}
+          {collection.is_editorial ? t('collections.editorial') : ownerName ? t('collections.by', { name: ownerName }) : t('collections.collection')}
+          {collection.visibility === 'private' && <Lock className="size-3" aria-label={t('common.private')} />}
         </p>
         <h3 className="mt-1 font-sans text-lg font-semibold tracking-normal group-hover:underline group-hover:underline-offset-4">{collection.title}</h3>
-        <p className="text-sm text-muted-foreground">{collection.product_count} product{collection.product_count === 1 ? '' : 's'}</p>
+        <p className="text-sm text-muted-foreground">{t(collection.product_count === 1 ? 'common.productsOne' : 'common.productsMany', { count: collection.product_count })}</p>
       </div>
     </Link>
   )
 }
 
-export function ArticleCard({
+export async function ArticleCard({
   article,
   authorName,
   className,
@@ -118,6 +123,7 @@ export function ArticleCard({
   className?: string
   layout?: 'vertical' | 'horizontal'
 }) {
+  const { t, f } = await getI18n()
   return (
     <Link
       href={`/magazine/${article.slug}`}
@@ -137,12 +143,12 @@ export function ArticleCard({
         />
       )}
       <div>
-        <p className="eyebrow">{labels.articleType[article.type as keyof typeof labels.articleType] ?? article.type}</p>
+        <p className="eyebrow">{t(`labels.articleType.${article.type}` as MessageKey)}</p>
         <h3 className="mt-1 font-display text-xl font-bold leading-snug group-hover:underline group-hover:underline-offset-4">{article.title}</h3>
         {article.excerpt && layout === 'vertical' && <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{article.excerpt}</p>}
         <p className="mt-2 text-xs text-muted-foreground">
           {authorName && <>{authorName} · </>}
-          {formatDate(article.published_at)} · {article.reading_minutes} min read
+          {f.date(article.published_at)} · {t('magazine.minRead', { count: article.reading_minutes })}
         </p>
       </div>
     </Link>

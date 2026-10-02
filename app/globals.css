@@ -170,3 +170,28 @@
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
+/* Traditional Chinese (Hong Kong). The Latin web fonts have no CJK glyphs,
+   so name Hong Kong system fonts explicitly (HK character forms rather than
+   Simplified or Japanese ones), loosen line height a little and drop the
+   tight Latin letter-spacing, which crowds Chinese characters. */
+html:lang(zh-HK) {
+  --cjk-fonts: 'PingFang HK', 'Noto Sans HK', 'Noto Sans TC', 'Microsoft JhengHei', 'Heiti TC', sans-serif;
+}
+html:lang(zh-HK),
+html:lang(zh-HK) .font-sans {
+  font-family: var(--font-sans), var(--cjk-fonts);
+}
+html:lang(zh-HK) :is(h1, h2, h3, h4),
+html:lang(zh-HK) .font-display {
+  font-family: var(--font-display), var(--cjk-fonts);
+  letter-spacing: normal;
+}
+html:lang(zh-HK) body {
+  line-height: 1.7;
+}
+html:lang(zh-HK) :is(h1, h2, h3, h4) {
+  line-height: 1.3;
+}
+html:lang(zh-HK) .eyebrow {
+  letter-spacing: 0.04em;
+}

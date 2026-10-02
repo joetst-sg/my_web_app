@@ -4,13 +4,15 @@ import { useFormStatus } from 'react-dom'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useT } from '@/components/i18n/provider'
 
 export function SubmitButton({ children, pendingLabel, className, ...props }: React.ComponentProps<typeof Button> & { pendingLabel?: string }) {
   const { pending } = useFormStatus()
+  const t = useT()
   return (
     <Button type="submit" size="lg" disabled={pending || props.disabled} className={cn('h-11', className)} {...props}>
       {pending && <Loader2 className="animate-spin" />}
-      {pending ? pendingLabel ?? 'Please wait…' : children}
+      {pending ? pendingLabel ?? t('common.pleaseWait') : children}
     </Button>
   )
 }

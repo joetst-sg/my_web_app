@@ -441,6 +441,7 @@ export type Database = {
           seo_title: string | null
           slug: string
           sort_order: number
+          translations: Json
           updated_at: string
         }
         Insert: {
@@ -458,6 +459,7 @@ export type Database = {
           seo_title?: string | null
           slug: string
           sort_order?: number
+          translations?: Json
           updated_at?: string
         }
         Update: {
@@ -475,6 +477,7 @@ export type Database = {
           seo_title?: string | null
           slug?: string
           sort_order?: number
+          translations?: Json
           updated_at?: string
         }
         Relationships: [
@@ -831,6 +834,7 @@ export type Database = {
           position: number
           subtitle: string | null
           title: string | null
+          translations: Json
           type: Database["public"]["Enums"]["homepage_section_type"]
           updated_at: string
           updated_by: string | null
@@ -842,6 +846,7 @@ export type Database = {
           position?: number
           subtitle?: string | null
           title?: string | null
+          translations?: Json
           type: Database["public"]["Enums"]["homepage_section_type"]
           updated_at?: string
           updated_by?: string | null
@@ -853,6 +858,7 @@ export type Database = {
           position?: number
           subtitle?: string | null
           title?: string | null
+          translations?: Json
           type?: Database["public"]["Enums"]["homepage_section_type"]
           updated_at?: string
           updated_by?: string | null
@@ -1891,6 +1897,7 @@ export type Database = {
           category_id: string | null
           category_name: string | null
           category_slug: string | null
+          category_translations: Json | null
           coupon_code: string | null
           currency: string | null
           deal_id: string | null
@@ -1923,6 +1930,7 @@ export type Database = {
           category_ids: string[] | null
           category_name: string | null
           category_slug: string | null
+          category_translations: Json | null
           click_count: number | null
           compare_at_price: number | null
           created_at: string | null
@@ -2045,6 +2053,7 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_api_role: { Args: never; Returns: boolean }
       is_staff: { Args: never; Returns: boolean }
+      kick_email_sender: { Args: never; Returns: undefined }
       next_submission_status: {
         Args: {
           _action: Database["public"]["Enums"]["review_action"]
@@ -2100,6 +2109,7 @@ export type Database = {
           score: number
         }[]
       }
+      retry_pending_emails: { Args: never; Returns: undefined }
       search_products: {
         Args: { q: string; result_limit?: number }
         Returns: {
@@ -2144,6 +2154,7 @@ export type Database = {
         }[]
       }
       submission_visible: { Args: { _submission_id: string }; Returns: boolean }
+      submissions_open: { Args: never; Returns: boolean }
       track_event: {
         Args: {
           anon_id?: string

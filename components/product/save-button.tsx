@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { LoginPrompt } from '@/components/common/login-prompt'
 import { toggleSave } from '@/lib/actions/engagement'
 import { LOGIN_REQUIRED } from '@/lib/errors'
+import { useT } from '@/components/i18n/provider'
 
 export function SaveButton({
   productId,
@@ -22,6 +23,7 @@ export function SaveButton({
   variant?: 'icon' | 'full'
   className?: string
 }) {
+  const t = useT()
   const [saved, setSaved] = useState(initialSaved)
   const [optimistic, setOptimistic] = useOptimistic(saved)
   const [pending, startTransition] = useTransition()
@@ -40,11 +42,11 @@ export function SaveButton({
         return
       }
       setSaved(next)
-      toast.success(next ? `Saved ${productName}` : 'Removed from saved')
+      toast.success(next ? t('product.savedToast', { name: productName }) : t('product.unsavedToast'))
     })
   }
 
-  const label = optimistic ? `Remove ${productName} from saved` : `Save ${productName}`
+  const label = optimistic ? t('product.unsaveLabel', { name: productName }) : t('product.saveLabel', { name: productName })
   return (
     <>
       {variant === 'icon' ? (
@@ -54,7 +56,7 @@ export function SaveButton({
           variant="secondary"
           aria-pressed={optimistic}
           aria-label={label}
-          title={optimistic ? 'Saved' : 'Save'}
+          title={optimistic ? t('product.saved') : t('product.save')}
           onClick={onClick}
           disabled={pending}
           className={cn('rounded-full bg-background/90 shadow-sm backdrop-blur hover:bg-background', className)}
@@ -64,7 +66,7 @@ export function SaveButton({
       ) : (
         <Button type="button" size="lg" variant="outline" aria-pressed={optimistic} onClick={onClick} disabled={pending} className={className}>
           <Bookmark className={cn(optimistic && 'fill-current')} />
-          {optimistic ? 'Saved' : 'Save'}
+          {optimistic ? t('product.saved') : t('product.save')}
         </Button>
       )}
       <LoginPrompt open={loginOpen} onOpenChange={setLoginOpen} />

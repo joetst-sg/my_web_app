@@ -1,22 +1,26 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
-import { redirect } from 'next/navigation'
+import Link from '@/components/i18n/link'
+import { getT, redirect } from '@/lib/i18n/server'
 import { getViewer, safeNext } from '@/lib/auth'
 import { SignupForm } from './signup-form'
 
-export const metadata: Metadata = { title: 'Create account', robots: { index: false } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('auth.signup.title'), robots: { index: false } }
+}
 
 export default async function SignupPage({ searchParams }: PageProps<'/signup'>) {
   const sp = await searchParams
   const next = safeNext(typeof sp.next === 'string' ? sp.next : null, '/onboarding')
-  if (await getViewer()) redirect('/')
+  if (await getViewer()) return redirect('/')
+  const t = await getT()
   return (
     <>
-      <h1 className="font-display text-3xl font-bold">Create your account</h1>
-      <p className="mb-6 mt-1 text-muted-foreground">Save products, build collections, follow brands and get reminders.</p>
+      <h1 className="font-display text-3xl font-bold">{t('auth.signup.heading')}</h1>
+      <p className="mb-6 mt-1 text-muted-foreground">{t('auth.signup.intro')}</p>
       <SignupForm next={next} />
       <p className="mt-6 text-center text-sm text-muted-foreground">
-        Already have an account? <Link href="/login" className="font-medium text-foreground underline underline-offset-4">Log in</Link>
+        {t('auth.signup.haveAccount')} <Link href="/login" className="font-medium text-foreground underline underline-offset-4">{t('auth.login.submit')}</Link>
       </p>
     </>
   )

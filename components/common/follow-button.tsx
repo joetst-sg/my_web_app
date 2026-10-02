@@ -3,6 +3,7 @@
 import { Check, Plus } from 'lucide-react'
 import { useOptimistic, useState, useTransition } from 'react'
 import { toast } from 'sonner'
+import { useT } from '@/components/i18n/provider'
 import { Button } from '@/components/ui/button'
 import { LoginPrompt } from '@/components/common/login-prompt'
 import { toggleCollectionFollow, toggleFollow } from '@/lib/actions/engagement'
@@ -23,24 +24,29 @@ export function FollowButton({
   className?: string
   size?: 'lg' | 'default' | 'sm'
 }) {
+  const t = useT()
   const [following, setFollowing] = useState(initialFollowing)
   const [optimistic, setOptimistic] = useOptimistic(following)
   const [pending, start] = useTransition()
   const [loginOpen, setLoginOpen] = useState(false)
-  const verb = kind === 'collection' ? ['Save collection', 'Saved'] : ['Follow', 'Following']
+  const isCollection = kind === 'collection'
 
   function onClick() {
     const next = !following
     start(async () => {
       setOptimistic(next)
-      const res = kind === 'collection' ? await toggleCollectionFollow(id, next) : await toggleFollow(kind, id, next)
+      const res = isCollection ? await toggleCollectionFollow(id, next) : await toggleFollow(kind, id, next)
       if (!res.ok) {
         if (res.error === LOGIN_REQUIRED) setLoginOpen(true)
         else toast.error(res.error)
         return
       }
       setFollowing(next)
-      toast.success(next ? `${kind === 'collection' ? 'Saved' : 'Following'} ${name}` : `${kind === 'collection' ? 'Removed' : 'Unfollowed'} ${name}`)
+      toast.success(
+        isCollection
+          ? t(next ? 'follow.savedCollectionToast' : 'follow.removedCollectionToast', { name })
+          : t(next ? 'follow.followingToast' : 'follow.unfollowedToast', { name }),
+      )
     })
   }
 
@@ -56,9 +62,9 @@ export function FollowButton({
         className={className}
       >
         {optimistic ? <Check /> : <Plus />}
-        {optimistic ? verb[1] : verb[0]}
+        {isCollection ? t(optimistic ? 'follow.savedCollection' : 'follow.saveCollection') : t(optimistic ? 'follow.following' : 'follow.follow')}
       </Button>
-      <LoginPrompt open={loginOpen} onOpenChange={setLoginOpen} reason={`follow ${name} and get a personalised feed`} />
+      <LoginPrompt open={loginOpen} onOpenChange={setLoginOpen} reason="loginPrompt.reasonFollow" />
     </>
   )
 }

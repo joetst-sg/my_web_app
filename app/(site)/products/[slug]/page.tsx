@@ -1,8 +1,8 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import { ChevronRight } from 'lucide-react'
+import Link from '@/components/i18n/link'
 import { SectionHeader } from '@/components/common/basics'
 import { CollectionCard } from '@/components/common/cards'
 import { TrackOnMount } from '@/components/common/track'
@@ -12,26 +12,30 @@ import { getViewer } from '@/lib/auth'
 import { collectionsContainingProduct } from '@/lib/db/content'
 import { toProductView } from '@/lib/db/product-view'
 import { getProductBySlug, productsByIds } from '@/lib/db/products'
+import { localizePath } from '@/lib/i18n/config'
+import { alternatesFor, getI18n } from '@/lib/i18n/server'
+import type { MessageKey } from '@/lib/i18n/translate'
 import { productImageUrl } from '@/lib/images'
 import { site } from '@/lib/site'
 import { createClient } from '@/lib/supabase/server'
 
 export async function generateMetadata({ params }: PageProps<'/products/[slug]'>): Promise<Metadata> {
   const { slug } = await params
-  const p = await getProductBySlug(slug)
-  if (!p || p.status !== 'published') return { title: 'Product not found', robots: { index: false } }
-  const title = p.seo_title || `${p.name}${p.brand ? ` by ${p.brand.name}` : ''}`
+  const [p, { t }] = await Promise.all([getProductBySlug(slug), getI18n()])
+  if (!p || p.status !== 'published') return { title: t('productPage.notFound'), robots: { index: false } }
+  const title = p.seo_title || (p.brand ? t('productPage.titleWithBrand', { name: p.name, brand: p.brand.name }) : p.name)
   const description = p.seo_description || p.tagline || undefined
   const image = productImageUrl(p.images[0]?.storage_path)
+  const alternates = await alternatesFor(`/products/${p.slug}`)
   return {
     title,
     description,
-    alternates: { canonical: `/products/${p.slug}` },
+    alternates,
     openGraph: {
       type: 'website',
       title,
       description,
-      url: `/products/${p.slug}`,
+      url: alternates.canonical,
       images: image ? [{ url: image, width: 1200, height: 900, alt: p.name }] : undefined,
     },
     twitter: { card: 'summary_large_image', title, description, images: image ? [image] : undefined },
@@ -40,12 +44,12 @@ export async function generateMetadata({ params }: PageProps<'/products/[slug]'>
 
 export default async function ProductPage({ params }: PageProps<'/products/[slug]'>) {
   const { slug } = await params
-  const product = await getProductBySlug(slug)
+  const [product, { t, locale }] = await Promise.all([getProductBySlug(slug), getI18n()])
   // Unpublished products are visible only to their seller and staff (RLS);
   // they get a notice so it's clear the public can't see them yet.
   if (!product) notFound()
 
-  const view = toProductView(product)
+  const view = toProductView(product, locale)
   const viewer = await getViewer()
   const supabase = await createClient()
 
@@ -59,7 +63,7 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
       ]).then(([s, r, f]) => ({ saved: Boolean(s.data), reminded: (r.data ?? []).length > 0, followsBrand: Boolean(f.data) }))
     : undefined
 
-  const url = `${site.url}/products/${product.slug}`
+  const url = `${site.url}${localizePath(`/products/${product.slug}`, locale)}`
   const jsonLd = [
     {
       '@context': 'https://schema.org',
@@ -97,8 +101,8 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
       '@context': 'https://schema.org',
       '@type': 'BreadcrumbList',
       itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: site.url },
-        ...(view.category ? [{ '@type': 'ListItem', position: 2, name: view.category.name, item: `${site.url}/categories/${view.category.slug}` }] : []),
+        { '@type': 'ListItem', position: 1, name: t('productPage.home'), item: `${site.url}${localizePath('/', locale)}` },
+        ...(view.category ? [{ '@type': 'ListItem', position: 2, name: view.category.name, item: `${site.url}${localizePath(`/categories/${view.category.slug}`, locale)}` }] : []),
         { '@type': 'ListItem', position: view.category ? 3 : 2, name: product.name, item: url },
       ],
     },
@@ -113,21 +117,21 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
         </>
       ) : (
         <div role="status" className="mb-6 rounded-xl border border-warning/40 bg-[oklch(0.97_0.04_80)] px-4 py-3 text-sm">
-          This product is <strong>{product.status.replace('_', ' ')}</strong> and is not visible to the public. You can see it because you are its seller or an editor.
+          {t('productPage.notPublic', { status: t(`labels.productStatus.${product.status}` as MessageKey) })}
         </div>
       )}
-      <nav aria-label="Breadcrumb" className="mb-6 text-sm text-muted-foreground">
+      <nav aria-label={t('productPage.breadcrumb')} className="mb-6 text-sm text-muted-foreground">
         <ol className="flex flex-wrap items-center gap-1">
-          <li><Link href="/" className="hover:text-foreground">Home</Link></li>
+          <li><Link href="/" className="hover:text-foreground">{t('productPage.home')}</Link></li>
           {view.category && (
             <li className="flex items-center gap-1">
               <ChevronRight className="size-3.5" aria-hidden />
               <Link href={`/categories/${view.category.slug}`} className="hover:text-foreground">{view.category.name}</Link>
             </li>
           )}
-          <li className="flex items-center gap-1">
-            <ChevronRight className="size-3.5" aria-hidden />
-            <span aria-current="page" className="text-foreground">{product.name}</span>
+          <li className="flex min-w-0 items-center gap-1">
+            <ChevronRight className="size-3.5 shrink-0" aria-hidden />
+            <span aria-current="page" className="truncate text-foreground">{product.name}</span>
           </li>
         </ol>
       </nav>
@@ -144,22 +148,23 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
 // Streamed after the main product content.
 async function RelatedSections({ productId }: { productId: string }) {
   const supabase = await createClient()
-  const [{ data: related }, collections] = await Promise.all([
+  const [{ data: related }, collections, { t }] = await Promise.all([
     supabase.rpc('related_products', { _product_id: productId, result_limit: 8 }),
     collectionsContainingProduct(productId),
+    getI18n(),
   ])
   const relatedCards = await productsByIds((related ?? []).map((r) => r.product_id))
   return (
     <>
       {relatedCards.length > 0 && (
         <section className="mt-20">
-          <SectionHeader title="Related products" subtitle="Same category, brand, tags or price range." />
+          <SectionHeader title={t('productPage.related')} subtitle={t('productPage.relatedHint')} />
           <ProductGrid products={relatedCards.slice(0, 8)} />
         </section>
       )}
       {collections.length > 0 && (
         <section className="mt-20">
-          <SectionHeader title="In these collections" />
+          <SectionHeader title={t('productPage.inCollections')} />
           <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
             {collections.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
           </div>

@@ -1,9 +1,10 @@
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { ArrowUpRight, BadgeCheck, Check, Globe } from 'lucide-react'
 import { BrandMark, StatusPill } from '@/components/common/basics'
 import { FollowButton } from '@/components/common/follow-button'
 import { Button } from '@/components/ui/button'
-import { formatDate, labels } from '@/lib/format'
+import { getI18n } from '@/lib/i18n/server'
+import type { MessageKey } from '@/lib/i18n/translate'
 import { videoEmbedUrl } from '@/lib/validation'
 import { AddToCollectionButton } from './add-to-collection'
 import { BuyButton } from './buy-button'
@@ -51,7 +52,7 @@ export type ProductView = {
   score: { overall: number; design: number | null; innovation: number | null; usability: number | null; value: number | null; features: number | null; verdict: string | null } | null
 }
 
-export function ProductDetailView({
+export async function ProductDetailView({
   product: p,
   preview = false,
   shareUrl,
@@ -62,9 +63,10 @@ export function ProductDetailView({
   shareUrl?: string
   viewer?: { saved: boolean; reminded: boolean; followsBrand: boolean }
 }) {
+  const { t, f } = await getI18n()
   const unavailable = p.availability === 'sold_out' || p.availability === 'discontinued'
   const breakdown = p.score
-    ? ([['Design', p.score.design], ['Innovation', p.score.innovation], ['Usability', p.score.usability], ['Value', p.score.value], ['Features', p.score.features]] as const).filter(([, v]) => v !== null)
+    ? ([[t('score.design'), p.score.design], [t('score.innovation'), p.score.innovation], [t('score.usability'), p.score.usability], [t('score.value'), p.score.value], [t('score.features'), p.score.features]] as const).filter(([, v]) => v !== null)
     : []
 
   return (
@@ -95,19 +97,19 @@ export function ProductDetailView({
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
             <StatusPill tone={unavailable ? 'danger' : p.availability === 'available' ? 'success' : 'warning'}>
-              {labels.availability[p.availability as keyof typeof labels.availability] ?? p.availability}
+              {t(`labels.availability.${p.availability}` as MessageKey)}
             </StatusPill>
-            {p.published_at && <span>Published {formatDate(p.published_at)}</span>}
-            {p.dealEndsAt && <span>· Deal ends {formatDate(p.dealEndsAt)}</span>}
+            {p.published_at && <span>{t('product.publishedOn', { date: f.date(p.published_at) })}</span>}
+            {p.dealEndsAt && <span>· {t('product.dealEnds', { date: f.date(p.dealEndsAt) })}</span>}
           </div>
 
           {preview ? (
-            <div className="flex flex-wrap gap-2" aria-label="Buttons are disabled in preview">
-              <Button size="lg" className="h-11 rounded-full px-5" disabled>Buy now <ArrowUpRight /></Button>
-              <Button size="lg" variant="outline" disabled>Save</Button>
-              <Button size="lg" variant="outline" disabled>Add to collection</Button>
-              <Button size="lg" variant="outline" disabled>Remind me</Button>
-              <Button size="lg" variant="outline" disabled>Share</Button>
+            <div className="flex flex-wrap gap-2" aria-label={t('product.previewDisabled')}>
+              <Button size="lg" className="h-11 rounded-full px-5" disabled>{t('product.buyNow')} <ArrowUpRight /></Button>
+              <Button size="lg" variant="outline" disabled>{t('product.save')}</Button>
+              <Button size="lg" variant="outline" disabled>{t('collections.addTo')}</Button>
+              <Button size="lg" variant="outline" disabled>{t('reminder.remindMe')}</Button>
+              <Button size="lg" variant="outline" disabled>{t('share.share')}</Button>
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -118,13 +120,11 @@ export function ProductDetailView({
               {shareUrl && <ShareButton url={shareUrl} title={p.name} productId={p.id} />}
             </div>
           )}
-          <p className="text-xs text-muted-foreground">
-            Buy now opens the maker&apos;s website. Loupe doesn&apos;t sell products or take payments.
-          </p>
+          <p className="text-xs text-muted-foreground">{t('product.buyNote')}</p>
 
           {p.key_features.length > 0 && (
             <section aria-labelledby="features" className="rounded-2xl bg-surface p-5">
-              <h2 id="features" className="font-sans text-base font-semibold tracking-normal">Key features</h2>
+              <h2 id="features" className="font-sans text-base font-semibold tracking-normal">{t('product.keyFeatures')}</h2>
               <ul className="mt-3 flex flex-col gap-2">
                 {p.key_features.map((f) => (
                   <li key={f} className="flex gap-2.5 text-sm">
@@ -142,7 +142,7 @@ export function ProductDetailView({
         <div className="flex flex-col gap-12">
           {p.description && (
             <section aria-labelledby="about">
-              <h2 id="about" className="font-display text-2xl font-bold">About the {p.name}</h2>
+              <h2 id="about" className="font-display text-2xl font-bold">{t('product.about', { name: p.name })}</h2>
               <div className="mt-4 flex max-w-[68ch] flex-col gap-4 leading-relaxed text-foreground/90">
                 {p.description.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
               </div>
@@ -156,7 +156,7 @@ export function ProductDetailView({
 
           {p.videos.length > 0 && (
             <section aria-labelledby="videos">
-              <h2 id="videos" className="font-display text-2xl font-bold">Video</h2>
+              <h2 id="videos" className="font-display text-2xl font-bold">{t('product.video')}</h2>
               <div className="mt-4 flex flex-col gap-4">
                 {p.videos.map((v) => {
                   const embed = videoEmbedUrl(v.url)
@@ -164,7 +164,7 @@ export function ProductDetailView({
                     <iframe
                       key={v.id}
                       src={embed}
-                      title={v.title ?? `${p.name} video`}
+                      title={v.title ?? t('product.videoTitle', { name: p.name })}
                       className="aspect-video w-full rounded-2xl"
                       loading="lazy"
                       allow="accelerometer; encrypted-media; gyroscope; picture-in-picture"
@@ -173,7 +173,7 @@ export function ProductDetailView({
                     />
                   ) : (
                     <a key={v.id} href={v.url} target="_blank" rel="noopener noreferrer nofollow" className="text-sm font-medium underline">
-                      Watch video: {v.title ?? v.url}
+                      {t('product.watchVideo', { title: v.title ?? v.url })}
                     </a>
                   )
                 })}
@@ -183,7 +183,7 @@ export function ProductDetailView({
 
           {p.specs.length > 0 && (
             <section aria-labelledby="specs">
-              <h2 id="specs" className="font-display text-2xl font-bold">Specifications</h2>
+              <h2 id="specs" className="font-display text-2xl font-bold">{t('product.specs')}</h2>
               <dl className="mt-4 divide-y rounded-2xl border">
                 {p.specs.map((s) => (
                   <div key={s.label} className="grid grid-cols-[minmax(8rem,1fr)_2fr] gap-4 px-4 py-3 text-sm">
@@ -208,7 +208,7 @@ export function ProductDetailView({
           {p.score && (
             <section aria-labelledby="score" className="rounded-2xl border p-5">
               <div className="flex items-center justify-between">
-                <h2 id="score" className="font-sans text-base font-semibold tracking-normal">Loupe editorial score</h2>
+                <h2 id="score" className="font-sans text-base font-semibold tracking-normal">{t('score.title')}</h2>
                 <span className="font-display text-3xl font-bold tabular-nums">
                   {Number(p.score.overall).toFixed(1)}<span className="text-base text-muted-foreground">/10</span>
                 </span>
@@ -232,15 +232,15 @@ export function ProductDetailView({
 
           {p.brand && (
             <section aria-labelledby="maker" className="rounded-2xl border p-5">
-              <h2 id="maker" className="eyebrow">About the maker</h2>
+              <h2 id="maker" className="eyebrow">{t('product.aboutMaker')}</h2>
               <div className="mt-3 flex items-center gap-3">
                 <BrandMark name={p.brand.name} logoUrl={p.brand.logo_url} size={48} />
                 <div className="min-w-0">
                   <Link href={`/brands/${p.brand.slug}`} className="flex items-center gap-1 font-semibold hover:underline">
                     {p.brand.name}
-                    {p.brand.is_verified && <BadgeCheck className="size-4 text-[oklch(0.55_0.15_250)]" aria-label="Verified brand" />}
+                    {p.brand.is_verified && <BadgeCheck className="size-4 text-[oklch(0.55_0.15_250)]" aria-label={t('common.verifiedBrand')} />}
                   </Link>
-                  <p className="text-xs text-muted-foreground">{p.brand.follower_count} followers</p>
+                  <p className="text-xs text-muted-foreground">{t(p.brand.follower_count === 1 ? 'common.followersOne' : 'common.followersMany', { count: p.brand.follower_count })}</p>
                 </div>
               </div>
               {(p.brand.tagline || p.brand.description) && (
@@ -252,7 +252,7 @@ export function ProductDetailView({
                 )}
                 {p.brand.website_url && (
                   <Button asChild variant="outline">
-                    <a href={p.brand.website_url} target="_blank" rel="noopener noreferrer nofollow"><Globe />Website</a>
+                    <a href={p.brand.website_url} target="_blank" rel="noopener noreferrer nofollow"><Globe />{t('common.website')}</a>
                   </Button>
                 )}
                 {Object.entries(p.brand.social_links ?? {}).map(([network, url]) =>

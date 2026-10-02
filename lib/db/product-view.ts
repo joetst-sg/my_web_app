@@ -2,10 +2,12 @@ import 'server-only'
 import type { ProductView } from '@/components/product/product-detail-view'
 import { productImageUrl } from '@/lib/images'
 import type { ProductDetail } from './products'
+import type { Locale } from '@/lib/i18n/config'
+import { localized } from '@/lib/i18n/content'
 
 // Normalises a product row (with relations) into the shape the product page,
 // the seller preview and the editor preview all render.
-export function toProductView(p: ProductDetail): ProductView {
+export function toProductView(p: ProductDetail, locale: Locale = 'en'): ProductView {
   const price = p.pricing?.price ?? p.price
   const compareAt = p.pricing?.compare_at_price ?? p.original_price
   return {
@@ -37,7 +39,7 @@ export function toProductView(p: ProductDetail): ProductView {
     })),
     videos: p.videos.map((v) => ({ id: v.id, url: v.url, title: v.title })),
     specs: p.specs.map((s) => ({ label: s.label, value: s.value })),
-    category: p.primaryCategory ? { slug: p.primaryCategory.slug, name: p.primaryCategory.name } : null,
+    category: p.primaryCategory ? { slug: p.primaryCategory.slug, name: localized(p.primaryCategory, 'name', locale) } : null,
     tags: (p.tags ?? []).map((t) => t.tag).filter((t): t is { slug: string; name: string } => Boolean(t)),
     score: p.score
       ? {

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { notFound } from 'next/navigation'
 import { cache } from 'react'
 import Markdown from 'react-markdown'
@@ -9,7 +9,9 @@ import { TrackOnMount } from '@/components/common/track'
 import { ProductGrid } from '@/components/product/product-grid'
 import { ShareButton } from '@/components/product/share-button'
 import { productsByIds } from '@/lib/db/products'
-import { formatDate, labels } from '@/lib/format'
+import { localizePath } from '@/lib/i18n/config'
+import { alternatesFor, getI18n } from '@/lib/i18n/server'
+import type { MessageKey } from '@/lib/i18n/translate'
 import { site } from '@/lib/site'
 import { createClient } from '@/lib/supabase/server'
 
@@ -25,12 +27,12 @@ const getArticle = cache(async (slug: string) => {
 
 export async function generateMetadata({ params }: PageProps<'/magazine/[slug]'>): Promise<Metadata> {
   const { slug } = await params
-  const a = await getArticle(slug)
-  if (!a || a.status !== 'published') return { title: 'Article not found', robots: { index: false } }
+  const [a, { t }] = await Promise.all([getArticle(slug), getI18n()])
+  if (!a || a.status !== 'published') return { title: t('pages.article.notFound'), robots: { index: false } }
   return {
     title: a.seo_title || a.title,
     description: a.seo_description || a.excerpt || undefined,
-    alternates: { canonical: `/magazine/${a.slug}` },
+    alternates: await alternatesFor(`/magazine/${a.slug}`),
     openGraph: {
       type: 'article',
       title: a.title,
@@ -47,12 +49,13 @@ export default async function ArticlePage({ params }: PageProps<'/magazine/[slug
   const article = await getArticle(slug)
   if (!article) notFound()
   const supabase = await createClient()
+  const { t, f, locale } = await getI18n()
   const [{ data: author }, { data: links }] = await Promise.all([
     article.author_id ? supabase.from('profiles').select('display_name').eq('id', article.author_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from('article_products').select('product_id, position').eq('article_id', article.id).order('position'),
   ])
   const products = await productsByIds((links ?? []).map((l) => l.product_id))
-  const url = `${site.url}/magazine/${article.slug}`
+  const url = `${site.url}${localizePath(`/magazine/${article.slug}`, locale)}`
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Article',
@@ -61,7 +64,8 @@ export default async function ArticlePage({ params }: PageProps<'/magazine/[slug
     image: article.featured_image_url ? [article.featured_image_url] : undefined,
     datePublished: article.published_at,
     dateModified: article.updated_at,
-    author: { '@type': 'Person', name: author?.display_name ?? `${site.name} editors` },
+    author: { '@type': 'Person', name: author?.display_name ?? t('pages.collection.editors', { site: site.name }) },
+    inLanguage: 'en',
     publisher: { '@type': 'Organization', name: site.name },
     mainEntityOfPage: url,
   }
@@ -75,17 +79,17 @@ export default async function ArticlePage({ params }: PageProps<'/magazine/[slug
         </>
       ) : (
         <div role="status" className="container-page mt-6 rounded-xl border bg-muted px-4 py-3 text-sm">
-          This article is <strong>{article.status}</strong> and only visible to editors.
+          {t('pages.article.notPublic', { status: article.status })}
         </div>
       )}
       <header className="container-page max-w-4xl pt-10 text-center">
         <Link href={`/magazine?type=${article.type}`} className="eyebrow hover:text-foreground">
-          {labels.articleType[article.type as keyof typeof labels.articleType]}
+          {t(`labels.articleType.${article.type}` as MessageKey)}
         </Link>
         <h1 className="mt-3 font-display text-4xl font-bold leading-tight sm:text-6xl">{article.title}</h1>
         {article.excerpt && <p className="mx-auto mt-5 max-w-2xl text-xl text-muted-foreground">{article.excerpt}</p>}
         <p className="mt-5 text-sm text-muted-foreground">
-          By {author?.display_name ?? `${site.name} editors`} · {formatDate(article.published_at ?? article.updated_at)} · {article.reading_minutes} min read
+          {t('pages.article.byline', { author: author?.display_name ?? t('pages.collection.editors', { site: site.name }), date: f.date(article.published_at ?? article.updated_at) })} · {t('magazine.minRead', { count: article.reading_minutes })}
         </p>
       </header>
       {article.featured_image_url && (
@@ -107,13 +111,13 @@ export default async function ArticlePage({ params }: PageProps<'/magazine/[slug
           </Markdown>
         </div>
         <div className="mt-10 flex items-center justify-between border-t pt-6">
-          <span className="text-sm text-muted-foreground">Share this article</span>
+          <span className="text-sm text-muted-foreground">{t('pages.article.share')}</span>
           <ShareButton url={url} title={article.title} />
         </div>
       </div>
       {products.length > 0 && (
         <section className="container-page mt-16">
-          <SectionHeader title="Products in this article" />
+          <SectionHeader title={t('pages.article.products')} />
           <ProductGrid products={products} />
         </section>
       )}

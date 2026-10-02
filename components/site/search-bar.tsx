@@ -1,16 +1,19 @@
 'use client'
 
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useLocalizedRouter, useT } from '@/components/i18n/provider'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Clock, Loader2, Search, TrendingUp, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { productImageUrl } from '@/lib/images'
+import type { Locale } from '@/lib/i18n/config'
+import { useLocale } from '@/components/i18n/provider'
+import { fromTranslations } from '@/lib/i18n/content'
 
 type Suggest = {
   products: { slug: string; name: string; brand_name: string | null; image_path: string | null }[]
   brands: { slug: string; name: string }[]
-  categories: { slug: string; name: string }[]
+  categories: { slug: string; name: string; translations?: unknown }[]
   popular?: string[]
 }
 
@@ -36,7 +39,9 @@ function pushRecent(q: string) {
 }
 
 export function SearchBar({ className, autoFocus = false, onNavigate }: { className?: string; autoFocus?: boolean; onNavigate?: () => void }) {
-  const router = useRouter()
+  const router = useLocalizedRouter()
+  const t = useT()
+  const locale: Locale = useLocale()
   const listId = useId()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState(false)
@@ -91,16 +96,16 @@ export function SearchBar({ className, autoFocus = false, onNavigate }: { classN
     const term = q.trim()
     const out: Option[] = []
     if (term.length >= 2) {
-      out.push({ key: 'q', kind: 'query', href: `/search?q=${encodeURIComponent(term)}`, label: `Search for “${term}”` })
+      out.push({ key: 'q', kind: 'query', href: `/search?q=${encodeURIComponent(term)}`, label: t('search.searchFor', { term }) })
       data?.products?.forEach((p) => out.push({ key: `p-${p.slug}`, kind: 'product', href: `/products/${p.slug}`, label: p.name, sub: p.brand_name ?? undefined, image: p.image_path }))
-      data?.brands?.forEach((b) => out.push({ key: `b-${b.slug}`, kind: 'brand', href: `/brands/${b.slug}`, label: b.name, sub: 'Brand' }))
-      data?.categories?.forEach((c) => out.push({ key: `c-${c.slug}`, kind: 'category', href: `/categories/${c.slug}`, label: c.name, sub: 'Category' }))
+      data?.brands?.forEach((b) => out.push({ key: `b-${b.slug}`, kind: 'brand', href: `/brands/${b.slug}`, label: b.name, sub: t('search.brand') }))
+      data?.categories?.forEach((c) => out.push({ key: `c-${c.slug}`, kind: 'category', href: `/categories/${c.slug}`, label: fromTranslations(c.translations, 'name', locale, c.name), sub: t('search.category') }))
     } else {
       recent.forEach((r) => out.push({ key: `r-${r}`, kind: 'recent', href: `/search?q=${encodeURIComponent(r)}`, label: r }))
       data?.popular?.filter((p) => !recent.includes(p)).forEach((p) => out.push({ key: `s-${p}`, kind: 'popular', href: `/search?q=${encodeURIComponent(p)}`, label: p }))
     }
     return out
-  }, [q, data, recent])
+  }, [q, data, recent, t, locale])
 
   function go(option: Option | null) {
     const term = q.trim()
@@ -143,7 +148,7 @@ export function SearchBar({ className, autoFocus = false, onNavigate }: { classN
           go(null)
         }}
       >
-        <label htmlFor={`${listId}-input`} className="sr-only">Search products, brands and categories</label>
+        <label htmlFor={`${listId}-input`} className="sr-only">{t('search.description')}</label>
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
         <input
           id={`${listId}-input`}
@@ -155,7 +160,7 @@ export function SearchBar({ className, autoFocus = false, onNavigate }: { classN
           aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
           autoComplete="off"
           autoFocus={autoFocus}
-          placeholder="Search products, brands…"
+          placeholder={t('search.placeholder')}
           value={q}
           onChange={(e) => {
             setQ(e.target.value)
@@ -168,20 +173,20 @@ export function SearchBar({ className, autoFocus = false, onNavigate }: { classN
           className="h-10 w-full rounded-full border bg-muted/60 pl-10 pr-10 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:border-foreground/30 focus:bg-background [&::-webkit-search-cancel-button]:hidden"
         />
         {loading ? (
-          <Loader2 className="absolute right-3.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label="Loading suggestions" />
+          <Loader2 className="absolute right-3.5 top-1/2 size-4 -translate-y-1/2 animate-spin text-muted-foreground" aria-label={t('search.loading')} />
         ) : q ? (
-          <button type="button" aria-label="Clear search" onClick={() => setQ('')} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted">
+          <button type="button" aria-label={t('search.clear')} onClick={() => setQ('')} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-muted-foreground hover:bg-muted">
             <X className="size-3.5" />
           </button>
         ) : null}
       </form>
       {showList && (
         <ul id={listId} role="listbox" className="absolute inset-x-0 top-12 z-50 max-h-[70vh] overflow-auto rounded-2xl border bg-popover p-2 shadow-lg">
-          {q.trim().length < 2 && recent.length > 0 && <li className="eyebrow px-3 pb-1 pt-2" role="presentation">Recent</li>}
+          {q.trim().length < 2 && recent.length > 0 && <li className="eyebrow px-3 pb-1 pt-2" role="presentation">{t('search.recent')}</li>}
           {options.map((o, i) => (
             <li key={o.key} id={`${listId}-${i}`} role="option" aria-selected={i === active}>
               {o.kind === 'popular' && (i === 0 || options[i - 1].kind !== 'popular') && (
-                <span className="eyebrow block px-3 pb-1 pt-2">Suggested</span>
+                <span className="eyebrow block px-3 pb-1 pt-2">{t('search.suggested')}</span>
               )}
               <button
                 type="button"

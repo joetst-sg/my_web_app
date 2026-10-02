@@ -7,13 +7,14 @@ import type { Database } from '@/lib/supabase/database.types'
 export type ProductCardRow = Database['public']['Views']['product_cards']['Row']
 
 export const CARD_COLUMNS =
-  'id, slug, name, tagline, currency, price, compare_at_price, discount_percent, availability, status, brand_name, brand_slug, category_name, category_slug, image_path, image_alt, score, is_featured, is_new, is_trending, trending_rank, deal_id, deal_ends_at, published_at, save_count, popularity_score' as const
+  'id, slug, name, tagline, currency, price, compare_at_price, discount_percent, availability, status, brand_name, brand_slug, category_name, category_slug, image_path, image_alt, score, is_featured, is_new, is_trending, trending_rank, deal_id, deal_ends_at, published_at, save_count, popularity_score, category_translations' as const
 
 export type ProductCardData = Pick<
   ProductCardRow,
   | 'id' | 'slug' | 'name' | 'tagline' | 'currency' | 'price' | 'compare_at_price' | 'discount_percent' | 'availability' | 'status'
   | 'brand_name' | 'brand_slug' | 'category_name' | 'category_slug' | 'image_path' | 'image_alt' | 'score' | 'is_featured'
   | 'is_new' | 'is_trending' | 'trending_rank' | 'deal_id' | 'deal_ends_at' | 'published_at' | 'save_count' | 'popularity_score'
+  | 'category_translations'
 >
 
 export { sortOptions, filterSchema, parseFilters, filtersToSearchParams, type ProductFilters } from '@/lib/filters'
@@ -168,7 +169,7 @@ export const getProductBySlug = cache(async (slug: string) => {
       images:product_images ( id, storage_path, alt, width, height, position ),
       videos:product_videos ( id, url, provider, title, position ),
       specs:product_specifications ( id, label, value, position ),
-      categories:product_categories ( is_primary, category:categories ( id, slug, name, parent_id ) ),
+      categories:product_categories ( is_primary, category:categories ( id, slug, name, parent_id, translations ) ),
       tags:product_tags ( tag:tags ( slug, name ) ),
       score:product_scores ( overall, design, innovation, usability, value, features, verdict )
     `)

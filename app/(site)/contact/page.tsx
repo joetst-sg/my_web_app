@@ -1,28 +1,33 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { PageHeader } from '@/components/common/basics'
+import { alternatesFor, getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = { title: 'Contact', alternates: { canonical: '/contact' } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('footer.contact'), alternates: await alternatesFor('/contact') }
+}
 
-export default function ContactPage() {
+export default async function ContactPage() {
+  const t = await getT()
   const rows = [
-    ['Report a listing', 'Use “Report this listing” on any product page. Reports go straight to the editors.', null],
-    ['Makers and brands', 'Submit your product, or message the editors from your submission page.', '/submit'],
-    ['Your account', 'Change your email, password and notifications in your account settings.', '/account/preferences'],
+    ['pages.contact.r1Title', 'pages.contact.r1Body', null],
+    ['pages.contact.r2Title', 'pages.contact.r2Body', '/submit'],
+    ['pages.contact.r3Title', 'pages.contact.r3Body', '/account/preferences'],
   ] as const
   return (
     <div className="container-page max-w-3xl py-12">
-      <PageHeader eyebrow="Contact" title="Get in touch" description="The fastest way to reach us depends on what you need." />
+      <PageHeader eyebrow={t('footer.contact')} title={t('pages.contact.title')} description={t('pages.contact.description')} />
       <ul className="mt-10 divide-y rounded-2xl border">
         {rows.map(([title, body, href]) => (
           <li key={title} className="p-6">
-            <h2 className="font-sans text-lg font-semibold tracking-normal">{title}</h2>
-            <p className="mt-1 text-muted-foreground">{body}</p>
-            {href && <Link href={href} className="mt-2 inline-block text-sm font-medium underline underline-offset-4">Go</Link>}
+            <h2 className="font-sans text-lg font-semibold tracking-normal">{t(title)}</h2>
+            <p className="mt-1 text-muted-foreground">{t(body)}</p>
+            {href && <Link href={href} className="mt-2 inline-block text-sm font-medium underline underline-offset-4">{t('pages.contact.go')}</Link>}
           </li>
         ))}
       </ul>
-      <p className="mt-6 text-sm text-muted-foreground">A general contact email will be listed here once the site launches publicly.</p>
+      <p className="mt-6 text-sm text-muted-foreground">{t('pages.contact.note')}</p>
     </div>
   )
 }

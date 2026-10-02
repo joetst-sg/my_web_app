@@ -1,6 +1,7 @@
+import type { Metadata } from 'next'
 import Image from 'next/image'
-import Link from 'next/link'
 import { Suspense } from 'react'
+import Link from '@/components/i18n/link'
 import { SectionHeader } from '@/components/common/basics'
 import { ArticleCard, CategoryCard, CollectionCard } from '@/components/common/cards'
 import { Hero } from '@/components/home/hero'
@@ -10,11 +11,17 @@ import { dealCards, featuredCategories, featuredCollections, homepageSections, l
 import {
   newestProducts, productsByIds, productsForPlacement, trendingProducts, viewerProductState, type ProductCardData,
 } from '@/lib/db/products'
-import { formatDate } from '@/lib/format'
+import { localized } from '@/lib/i18n/content'
+import { alternatesFor, getI18n } from '@/lib/i18n/server'
+import type { MessageKey } from '@/lib/i18n/translate'
 import { productImageUrl } from '@/lib/images'
 
 type Section = Awaited<ReturnType<typeof homepageSections>>[number]
 type Config = { limit?: number; product_ids?: string[] }
+
+export async function generateMetadata(): Promise<Metadata> {
+  return { alternates: await alternatesFor('/') }
+}
 
 export default async function HomePage() {
   const sections = await homepageSections()
@@ -29,10 +36,15 @@ export default async function HomePage() {
   )
 }
 
-// Each section is configured in the admin CMS (/admin/content).
+// Each section is configured in the admin CMS (/admin/content). Titles come
+// from the database (with translations) or a translated default per type.
 async function HomeSection({ section: s }: { section: Section }) {
+  const { t, f, locale } = await getI18n()
   const config = (s.config ?? {}) as Config
   const limit = Math.min(config.limit ?? 8, 24)
+  const title = localized(s, 'title', locale) || t(`home.sections.${s.type}` as MessageKey)
+  const subtitle = localized(s, 'subtitle', locale) || null
+  const viewAll = t('common.viewAll')
 
   switch (s.type) {
     case 'hero': {
@@ -46,7 +58,7 @@ async function HomeSection({ section: s }: { section: Section }) {
       const cats = await featuredCategories(limit)
       return (
         <section className="container-page">
-          <SectionHeader title={s.title ?? 'Browse by category'} subtitle={s.subtitle} href="/categories" />
+          <SectionHeader title={title} subtitle={subtitle} href="/categories" linkLabel={viewAll} />
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
             {cats.map((c) => <CategoryCard key={c.id} category={c} className="min-h-40" />)}
           </div>
@@ -54,27 +66,28 @@ async function HomeSection({ section: s }: { section: Section }) {
       )
     }
     case 'trending_products':
-      return <ProductSection title={s.title ?? 'Trending'} subtitle={s.subtitle} href="/trending" products={await trendingProducts(limit)} />
+      return <ProductSection title={title} subtitle={subtitle} href="/trending" linkLabel={viewAll} products={await trendingProducts(limit)} />
     case 'new_products':
-      return <ProductSection title={s.title ?? 'New'} subtitle={s.subtitle} href="/new" products={await newestProducts(limit)} />
+      return <ProductSection title={title} subtitle={subtitle} href="/new" linkLabel={viewAll} products={await newestProducts(limit)} />
     case 'editors_picks':
       return (
         <ProductSection
-          title={s.title ?? "Editor's picks"}
-          subtitle={s.subtitle}
+          title={title}
+          subtitle={subtitle}
           href="/discover?featured=1"
+          linkLabel={viewAll}
           products={await productsForPlacement('editors_pick', limit)}
           columns={3}
         />
       )
     case 'product_list':
-      return <ProductSection title={s.title ?? 'Products'} subtitle={s.subtitle} products={await productsByIds((config.product_ids ?? []).slice(0, limit))} />
+      return <ProductSection title={title} subtitle={subtitle} products={await productsByIds((config.product_ids ?? []).slice(0, limit))} />
     case 'featured_collections': {
       const cols = await featuredCollections(Math.min(limit, 8))
       if (cols.length === 0) return null
       return (
         <section className="container-page">
-          <SectionHeader title={s.title ?? 'Collections'} subtitle={s.subtitle} href="/collections" />
+          <SectionHeader title={title} subtitle={subtitle} href="/collections" linkLabel={viewAll} />
           <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
             {cols.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
           </div>
@@ -87,7 +100,7 @@ async function HomeSection({ section: s }: { section: Section }) {
       return (
         <section className="bg-surface py-14">
           <div className="container-page">
-            <SectionHeader title={s.title ?? 'Deals'} subtitle={s.subtitle} href="/deals" />
+            <SectionHeader title={title} subtitle={subtitle} href="/deals" linkLabel={viewAll} />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {deals.map((d) => (
                 <Link key={d.deal_id} href={`/products/${d.slug}`} className="group flex gap-4 rounded-2xl border bg-background p-3 hover:border-foreground/30">
@@ -101,7 +114,7 @@ async function HomeSection({ section: s }: { section: Section }) {
                       <PriceDisplay price={d.deal_price} originalPrice={d.original_price} currency={d.currency} size="sm" />
                       <DiscountBadge percent={d.discount_percent} className="h-5" />
                     </span>
-                    {d.ends_at && <span className="text-xs text-muted-foreground">Ends {formatDate(d.ends_at)}</span>}
+                    {d.ends_at && <span className="text-xs text-muted-foreground">{t('deals.endsOn', { date: f.date(d.ends_at) })}</span>}
                   </div>
                 </Link>
               ))}
@@ -115,7 +128,7 @@ async function HomeSection({ section: s }: { section: Section }) {
       if (items.length === 0) return null
       return (
         <section className="container-page">
-          <SectionHeader title={s.title ?? 'Magazine'} subtitle={s.subtitle} href="/magazine" />
+          <SectionHeader title={title} subtitle={subtitle} href="/magazine" linkLabel={viewAll} />
           <div className="grid gap-10 md:grid-cols-3">
             {items.map((a) => <ArticleCard key={a.id} article={a} authorName={a.authorName} />)}
           </div>
@@ -131,19 +144,21 @@ async function ProductSection({
   title,
   subtitle,
   href,
+  linkLabel,
   products,
   columns = 4,
 }: {
   title: string
   subtitle?: string | null
   href?: string
+  linkLabel?: string
   products: ProductCardData[]
   columns?: 3 | 4
 }) {
   if (products.length === 0) return null
   return (
     <section className="container-page">
-      <SectionHeader title={title} subtitle={subtitle} href={href} />
+      <SectionHeader title={title} subtitle={subtitle} href={href} linkLabel={linkLabel} />
       <ProductGrid products={products} columns={columns} />
     </section>
   )

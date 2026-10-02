@@ -1,15 +1,20 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { Bell, BellRing, Bookmark, FolderHeart, Heart, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { requireViewer } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = { title: 'Your account', robots: { index: false } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('account.overview.title'), robots: { index: false } }
+}
 
 export default async function AccountPage() {
   const viewer = await requireViewer('/account')
   const supabase = await createClient()
+  const t = await getT()
   const count = (q: PromiseLike<{ count: number | null }>) => Promise.resolve(q).then((r) => r.count ?? 0)
   const [saved, collections, brands, cats, reminders, unread] = await Promise.all([
     count(supabase.from('product_saves').select('*', { count: 'exact', head: true }).eq('user_id', viewer.id)),
@@ -20,17 +25,17 @@ export default async function AccountPage() {
     count(supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', viewer.id).is('read_at', null)),
   ])
   const tiles = [
-    ['/account/saved', 'Saved products', saved, Bookmark],
-    ['/account/collections', 'Collections', collections, FolderHeart],
-    ['/account/following', 'Following', brands + cats, Heart],
-    ['/account/reminders', 'Active reminders', reminders, BellRing],
-    ['/account/notifications', 'Unread notifications', unread, Bell],
+    ['/account/saved', t('account.overview.saved'), saved, Bookmark],
+    ['/account/collections', t('account.nav.collections'), collections, FolderHeart],
+    ['/account/following', t('account.nav.following'), brands + cats, Heart],
+    ['/account/reminders', t('account.overview.reminders'), reminders, BellRing],
+    ['/account/notifications', t('account.overview.unread'), unread, Bell],
   ] as const
 
   return (
     <div className="flex flex-col gap-10">
       <div>
-        <h1 className="font-display text-3xl font-bold sm:text-4xl">Hi {viewer.displayName ?? viewer.username}</h1>
+        <h1 className="font-display text-3xl font-bold sm:text-4xl">{t('account.overview.hi', { name: viewer.displayName ?? viewer.username ?? '' })}</h1>
         <p className="mt-1 text-muted-foreground">@{viewer.username} · {viewer.email}</p>
       </div>
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
@@ -46,13 +51,13 @@ export default async function AccountPage() {
         <div className="flex items-start gap-3">
           <Store className="mt-1 size-5" aria-hidden />
           <div>
-            <h2 className="font-sans text-base font-semibold tracking-normal">{viewer.isSeller ? 'Your seller dashboard' : 'Make something great?'}</h2>
+            <h2 className="font-sans text-base font-semibold tracking-normal">{viewer.isSeller ? t('account.overview.sellerHeading') : t('account.overview.becomeHeading')}</h2>
             <p className="text-sm text-muted-foreground">
-              {viewer.isSeller ? 'Track submissions and see how your products perform.' : 'Submit your product for editorial review. It’s free.'}
+              {viewer.isSeller ? t('account.overview.sellerBody') : t('account.overview.becomeBody')}
             </p>
           </div>
         </div>
-        <Button asChild size="lg"><Link href={viewer.isSeller ? '/seller/dashboard' : '/seller'}>{viewer.isSeller ? 'Open dashboard' : 'Become a seller'}</Link></Button>
+        <Button asChild size="lg"><Link href={viewer.isSeller ? '/seller/dashboard' : '/seller'}>{viewer.isSeller ? t('account.overview.openDashboard') : t('account.overview.becomeSeller')}</Link></Button>
       </section>
     </div>
   )

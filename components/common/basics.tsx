@@ -1,5 +1,5 @@
 import Image from 'next/image'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { hueFor, initials } from '@/lib/images'
@@ -8,13 +8,14 @@ export function SectionHeader({
   title,
   subtitle,
   href,
-  linkLabel = 'View all',
+  linkLabel,
   as: Tag = 'h2',
   className,
 }: {
   title: string
   subtitle?: string | null
   href?: string
+  // Required with href: pass the translated label (e.g. t('common.viewAll')).
   linkLabel?: string
   as?: 'h1' | 'h2'
   className?: string

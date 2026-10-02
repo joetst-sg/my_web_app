@@ -1,10 +1,21 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
+import type { MessageKey, Translate } from '@/lib/i18n/translate'
 
 export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'] as const
 
-export class UploadError extends Error {}
+// message is English (admin); key/vars let the site show it in the visitor's language.
+export class UploadError extends Error {
+  constructor(message: string, readonly key?: MessageKey, readonly vars?: Record<string, string | number>) {
+    super(message)
+  }
+}
+
+export function uploadErrorText(e: unknown, t: Translate): string {
+  if (e instanceof UploadError) return e.key ? t(e.key, e.vars) : e.message
+  return t('errors.uploadFailed')
+}
 
 // Magic-byte sniffing: the file must really be the image type it claims.
 async function sniff(file: File): Promise<string | null> {
@@ -29,21 +40,21 @@ export async function prepareImage(
   { maxBytes = 15 * 1024 * 1024, minWidth = 600, minHeight = 400, maxSize = 2400, quality = 0.86 } = {},
 ): Promise<PreparedImage> {
   if (!ACCEPTED_TYPES.includes(file.type as (typeof ACCEPTED_TYPES)[number])) {
-    throw new UploadError('Please upload a JPG, PNG, WebP or AVIF image.')
+    throw new UploadError('Please upload a JPG, PNG, WebP or AVIF image.', 'upload.badType')
   }
-  if (file.size > maxBytes) throw new UploadError(`That file is too large. The limit is ${Math.round(maxBytes / 1024 / 1024)} MB.`)
+  if (file.size > maxBytes) throw new UploadError(`That file is too large. The limit is ${Math.round(maxBytes / 1024 / 1024)} MB.`, 'upload.tooLargeLimit', { mb: Math.round(maxBytes / 1024 / 1024) })
   const real = await sniff(file)
-  if (!real || real !== file.type) throw new UploadError("That file isn't a valid image.")
+  if (!real || real !== file.type) throw new UploadError("That file isn't a valid image.", 'upload.invalid')
 
   let bitmap: ImageBitmap
   try {
     bitmap = await createImageBitmap(file)
   } catch {
-    throw new UploadError("That image couldn't be read. Try exporting it again as JPG or PNG.")
+    throw new UploadError("That image couldn't be read. Try exporting it again as JPG or PNG.", 'upload.unreadable')
   }
   if (bitmap.width < minWidth || bitmap.height < minHeight) {
     bitmap.close()
-    throw new UploadError(`Images must be at least ${minWidth}×${minHeight} pixels. This one is ${bitmap.width}×${bitmap.height}.`)
+    throw new UploadError(`Images must be at least ${minWidth}×${minHeight} pixels. This one is ${bitmap.width}×${bitmap.height}.`, 'upload.tooSmall', { minWidth, minHeight, width: bitmap.width, height: bitmap.height })
   }
   const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height))
   const width = Math.round(bitmap.width * scale)
@@ -52,7 +63,7 @@ export async function prepareImage(
   canvas.width = width
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  if (!ctx) throw new UploadError('Your browser could not process this image.')
+  if (!ctx) throw new UploadError('Your browser could not process this image.', 'upload.browser')
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close()
   // Prefer WebP; browsers that can't encode it (Safari) produce JPEG instead.
@@ -63,7 +74,7 @@ export async function prepareImage(
     ext = 'jpg'
   }
   if (!blob || (blob.type !== 'image/webp' && blob.type !== 'image/jpeg')) {
-    throw new UploadError('Your browser could not process this image. Please try another browser.')
+    throw new UploadError('Your browser could not process this image. Please try another browser.', 'upload.browserOther')
   }
   return { blob, width, height, previewUrl: URL.createObjectURL(blob), ext }
 }
@@ -78,7 +89,7 @@ export async function uploadWithProgress(
 ): Promise<string> {
   const supabase = createClient()
   const { data: { session } } = await supabase.auth.getSession()
-  if (!session) throw new UploadError('Your session has expired. Please log in again.')
+  if (!session) throw new UploadError('Your session has expired. Please log in again.', 'upload.session')
   const base = process.env.NEXT_PUBLIC_SUPABASE_URL!.replace(/\/$/, '')
 
   await new Promise<void>((resolve, reject) => {
@@ -91,11 +102,11 @@ export async function uploadWithProgress(
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(e.loaded / e.total)
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else if (xhr.status === 403 || xhr.status === 401) reject(new UploadError("You don't have permission to upload here."))
-      else if (xhr.status === 413) reject(new UploadError('That file is too large.'))
-      else reject(new UploadError('Upload failed. Please try again.'))
+      else if (xhr.status === 403 || xhr.status === 401) reject(new UploadError("You don't have permission to upload here.", 'upload.forbidden'))
+      else if (xhr.status === 413) reject(new UploadError('That file is too large.', 'upload.tooLarge'))
+      else reject(new UploadError('Upload failed. Please try again.', 'errors.uploadFailed'))
     }
-    xhr.onerror = () => reject(new UploadError('Upload failed. Check your connection and try again.'))
+    xhr.onerror = () => reject(new UploadError('Upload failed. Check your connection and try again.', 'upload.network'))
     xhr.send(blob)
   })
   onProgress?.(1)
@@ -105,5 +116,5 @@ export async function uploadWithProgress(
 export async function removeObject(bucket: string, path: string) {
   const supabase = createClient()
   const { error } = await supabase.storage.from(bucket).remove([path])
-  if (error) throw new UploadError('Could not delete the file. Please try again.')
+  if (error) throw new UploadError('Could not delete the file. Please try again.', 'upload.deleteFailed')
 }

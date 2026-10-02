@@ -1,8 +1,8 @@
 'use client'
 
 import Image from 'next/image'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import Link from '@/components/i18n/link'
+import { useLocalizedRouter, useT } from '@/components/i18n/provider'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core'
@@ -24,9 +24,10 @@ type Item = { id: string; name: string; slug: string; brand: string | null; imag
 
 function Row({ item, onRemove, disabled }: { item: Item; onRemove: () => void; disabled: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const t = useT()
   return (
     <li ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={`flex items-center gap-3 bg-background p-3 ${isDragging ? 'relative z-10 shadow-lg' : ''}`}>
-      <button type="button" {...attributes} {...listeners} aria-label={`Reorder ${item.name}. Use space and arrow keys.`} className="cursor-grab rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing">
+      <button type="button" {...attributes} {...listeners} aria-label={t('account.collections.reorder', { name: item.name })} className="cursor-grab rounded p-1 text-muted-foreground hover:bg-muted active:cursor-grabbing">
         <GripVertical className="size-4" />
       </button>
       {item.image && <Image src={productImageUrl(item.image)!} alt="" width={120} height={90} className="aspect-[4/3] w-16 rounded-md object-cover" />}
@@ -34,7 +35,7 @@ function Row({ item, onRemove, disabled }: { item: Item; onRemove: () => void; d
         <Link href={`/products/${item.slug}`} className="font-medium hover:underline">{item.name}</Link>
         {item.brand && <p className="text-xs text-muted-foreground">{item.brand}</p>}
       </div>
-      <Button variant="ghost" size="icon-lg" aria-label={`Remove ${item.name}`} onClick={onRemove} disabled={disabled}><Trash2 /></Button>
+      <Button variant="ghost" size="icon-lg" aria-label={t('account.collections.removeItem', { name: item.name })} onClick={onRemove} disabled={disabled}><Trash2 /></Button>
     </li>
   )
 }
@@ -46,7 +47,8 @@ export function CollectionEditor({
   collection: { id: string; slug: string; title: string; description: string; visibility: string }
   products: Item[]
 }) {
-  const router = useRouter()
+  const router = useLocalizedRouter()
+  const t = useT()
   const [items, setItems] = useState(products)
   const [error, setError] = useState<string | null>(null)
   const [pending, start] = useTransition()
@@ -62,7 +64,7 @@ export function CollectionEditor({
       })
       if (!res.ok) setError(res.error)
       else {
-        toast.success('Collection saved')
+        toast.success(t('act.collectionUpdated'))
         router.refresh()
       }
     })
@@ -86,7 +88,7 @@ export function CollectionEditor({
       if (!res.ok) {
         setItems(before)
         toast.error(res.error)
-      } else toast.success(`Removed ${item.name}`)
+      } else toast.success(t('account.collections.removed', { name: item.name }))
     })
   }
 
@@ -94,34 +96,34 @@ export function CollectionEditor({
     <div className="flex flex-col gap-10">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow"><Link href="/account/collections" className="hover:text-foreground">Your collections</Link></p>
+          <p className="eyebrow"><Link href="/account/collections" className="hover:text-foreground">{t('account.collections.title')}</Link></p>
           <h1 className="mt-1 font-display text-3xl font-bold">{collection.title}</h1>
         </div>
-        <Button asChild variant="outline"><Link href={`/collections/${collection.slug}`}><ExternalLink />View collection</Link></Button>
+        <Button asChild variant="outline"><Link href={`/collections/${collection.slug}`}><ExternalLink />{t('account.collections.view')}</Link></Button>
       </div>
 
       <form action={save} className="grid max-w-2xl gap-4">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="title">Name</Label>
+          <Label htmlFor="title">{t('account.collections.name')}</Label>
           <Input id="title" name="title" defaultValue={collection.title} required minLength={2} maxLength={80} />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="description">Description</Label>
+          <Label htmlFor="description">{t('account.collections.description')}</Label>
           <Textarea id="description" name="description" defaultValue={collection.description} maxLength={600} rows={3} />
         </div>
         <div className="flex items-center gap-2">
           <Switch id="public" name="public" defaultChecked={collection.visibility === 'public'} />
-          <Label htmlFor="public" className="font-normal">Public — anyone with the link can see it</Label>
+          <Label htmlFor="public" className="font-normal">{t('collections.publicHint')}</Label>
         </div>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-        <div><Button type="submit" size="lg" disabled={pending}>Save changes</Button></div>
+        <div><Button type="submit" size="lg" disabled={pending}>{t('account.saveChanges')}</Button></div>
       </form>
 
       <section aria-labelledby="products-h">
-        <h2 id="products-h" className="font-sans text-lg font-semibold tracking-normal">Products ({items.length})</h2>
-        <p className="mb-4 text-sm text-muted-foreground">Drag to reorder. Changes save automatically.</p>
+        <h2 id="products-h" className="font-sans text-lg font-semibold tracking-normal">{t('account.collections.products', { count: items.length })}</h2>
+        <p className="mb-4 text-sm text-muted-foreground">{t('account.collections.dragHint')}</p>
         {items.length === 0 ? (
-          <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No products yet. Use “Add to collection” on any product page.</p>
+          <p className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">{t('account.collections.noProducts')}</p>
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
@@ -134,32 +136,32 @@ export function CollectionEditor({
       </section>
 
       <section className="rounded-2xl border border-destructive/30 p-5">
-        <h2 className="font-sans text-base font-semibold tracking-normal">Delete collection</h2>
-        <p className="mt-1 text-sm text-muted-foreground">The products stay on Loupe; only this list is deleted.</p>
+        <h2 className="font-sans text-base font-semibold tracking-normal">{t('account.collections.delete')}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{t('account.collections.deleteBody')}</p>
         <AlertDialog>
           <AlertDialogTrigger asChild>
-            <Button variant="destructive" className="mt-3">Delete collection</Button>
+            <Button variant="destructive" className="mt-3">{t('account.collections.delete')}</Button>
           </AlertDialogTrigger>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Delete “{collection.title}”?</AlertDialogTitle>
-              <AlertDialogDescription>This can&apos;t be undone.</AlertDialogDescription>
+              <AlertDialogTitle>{t('account.collections.deleteConfirm', { title: collection.title })}</AlertDialogTitle>
+              <AlertDialogDescription>{t('account.cantUndo')}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() =>
                   start(async () => {
                     const res = await deleteCollection(collection.id)
                     if (!res.ok) toast.error(res.error)
                     else {
-                      toast.success('Collection deleted')
+                      toast.success(t('act.collectionDeleted'))
                       router.push('/account/collections')
                     }
                   })
                 }
               >
-                Delete
+                {t('common.delete')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

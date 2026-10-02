@@ -1,6 +1,6 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useLocalizedRouter, useT } from '@/components/i18n/provider'
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/input'
@@ -14,7 +14,8 @@ type Values = { price: string; original_price: string; currency: string; availab
 const toLocal = (iso: string | null) => (iso ? new Date(iso).toISOString().slice(0, 16) : '')
 
 export function PricingForm({ productId, initial }: { productId: string; initial: { price: number | null; original_price: number | null; currency: string; availability: string; sale_starts_at: string | null; sale_ends_at: string | null } }) {
-  const router = useRouter()
+  const router = useLocalizedRouter()
+  const t = useT()
   const [v, setV] = useState<Values>({
     price: initial.price?.toString() ?? '',
     original_price: initial.original_price?.toString() ?? '',
@@ -52,7 +53,7 @@ export function PricingForm({ productId, initial }: { productId: string; initial
         return
       }
       setDirty(false)
-      toast.success('Pricing saved')
+      toast.success(t('seller.pricing.saved'))
       if (andContinue) router.push(`/seller/products/${productId}/edit?step=3`)
       router.refresh()
     })
@@ -62,17 +63,17 @@ export function PricingForm({ productId, initial }: { productId: string; initial
     <form onSubmit={(e) => { e.preventDefault(); save(true) }} className="flex max-w-3xl flex-col gap-6" noValidate>
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="flex flex-col gap-2">
-          <Label htmlFor="price">Current price</Label>
+          <Label htmlFor="price">{t('seller.pricing.price')}</Label>
           <Input id="price" inputMode="decimal" value={v.price} onChange={(e) => set('price')(e.target.value.replace(/[^0-9.]/g, ''))} className="h-11 font-mono" aria-invalid={Boolean(errors.price)} aria-describedby="price-help" />
           <FieldHelp id="price-help" error={errors.price} />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="original_price">Original price (optional)</Label>
+          <Label htmlFor="original_price">{t('seller.pricing.original')} {t('common.optional')}</Label>
           <Input id="original_price" inputMode="decimal" value={v.original_price} onChange={(e) => set('original_price')(e.target.value.replace(/[^0-9.]/g, ''))} className="h-11 font-mono" aria-invalid={Boolean(errors.original_price)} aria-describedby="orig-help" />
-          <FieldHelp id="orig-help" error={errors.original_price} hint={discount ? `Shows as ${discount}% off` : 'Only if the product is discounted.'} />
+          <FieldHelp id="orig-help" error={errors.original_price} hint={discount ? t('seller.pricing.showsAs', { discount }) : t('seller.pricing.originalHint')} />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="currency">Currency</Label>
+          <Label htmlFor="currency">{t('seller.pricing.currency')}</Label>
           <Select value={v.currency} onValueChange={set('currency')}>
             <SelectTrigger id="currency" className="h-11 w-full"><SelectValue /></SelectTrigger>
             <SelectContent>{['USD', 'EUR', 'GBP', 'HKD', 'JPY', 'CAD', 'AUD', 'SGD'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
@@ -80,31 +81,31 @@ export function PricingForm({ productId, initial }: { productId: string; initial
         </div>
       </div>
       <div className="flex flex-col gap-2 sm:max-w-xs">
-        <Label htmlFor="availability">Availability</Label>
+        <Label htmlFor="availability">{t('seller.pricing.availability')}</Label>
         <Select value={v.availability} onValueChange={set('availability')}>
           <SelectTrigger id="availability" className="h-11 w-full"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="available">Available now</SelectItem>
-            <SelectItem value="preorder">Pre-order</SelectItem>
-            <SelectItem value="crowdfunding">Crowdfunding</SelectItem>
-            <SelectItem value="coming_soon">Coming soon</SelectItem>
-            <SelectItem value="sold_out">Sold out</SelectItem>
+            <SelectItem value="available">{t('seller.pricing.availableNow')}</SelectItem>
+            <SelectItem value="preorder">{t('labels.availability.preorder')}</SelectItem>
+            <SelectItem value="crowdfunding">{t('labels.availability.crowdfunding')}</SelectItem>
+            <SelectItem value="coming_soon">{t('labels.availability.coming_soon')}</SelectItem>
+            <SelectItem value="sold_out">{t('labels.availability.sold_out')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
       <fieldset className="grid gap-4 sm:grid-cols-2">
-        <legend className="mb-2 text-sm font-medium">Sale dates (optional)</legend>
+        <legend className="mb-2 text-sm font-medium">{t('seller.pricing.saleDates')} {t('common.optional')}</legend>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="sale_starts_at" className="font-normal">Sale starts</Label>
+          <Label htmlFor="sale_starts_at" className="font-normal">{t('seller.pricing.saleStarts')}</Label>
           <Input id="sale_starts_at" type="datetime-local" value={v.sale_starts_at} onChange={(e) => set('sale_starts_at')(e.target.value)} className="h-11" />
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="sale_ends_at" className="font-normal">Sale ends</Label>
+          <Label htmlFor="sale_ends_at" className="font-normal">{t('seller.pricing.saleEnds')}</Label>
           <Input id="sale_ends_at" type="datetime-local" value={v.sale_ends_at} onChange={(e) => set('sale_ends_at')(e.target.value)} className="h-11" aria-invalid={Boolean(errors.sale_ends_at)} aria-describedby="end-help" />
           <FieldHelp id="end-help" error={errors.sale_ends_at} />
         </div>
       </fieldset>
-      <p className="text-sm text-muted-foreground">Featured deals on the Deals page are set up by our editors after review.</p>
+      <p className="text-sm text-muted-foreground">{t('seller.pricing.dealsNote')}</p>
       <StepActions pending={pending} onSave={() => save(false)} onContinue={() => save(true)} backHref={`/seller/products/${productId}/edit?step=1`} />
     </form>
   )

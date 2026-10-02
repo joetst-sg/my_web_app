@@ -1,25 +1,37 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { PageHeader } from '@/components/common/basics'
+import { alternatesFor, getT } from '@/lib/i18n/server'
 import { site } from '@/lib/site'
 
-export const metadata: Metadata = { title: 'About', description: `How ${site.name} finds, reviews and publishes products.`, alternates: { canonical: '/about' } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('footer.about'), description: t('pages.about.meta', { name: site.name }), alternates: await alternatesFor('/about') }
+}
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const t = await getT()
+  const points = [
+    ['pages.about.p1Title', 'pages.about.p1Body'],
+    ['pages.about.p2Title', 'pages.about.p2Body'],
+    ['pages.about.p3Title', 'pages.about.p3Body'],
+    ['pages.about.p4Title', 'pages.about.p4Body'],
+  ] as const
   return (
     <div className="container-page max-w-3xl py-12">
-      <PageHeader eyebrow="About" title={`Why ${site.name}`} description="A slower, more careful way to discover new products." />
+      <PageHeader eyebrow={t('footer.about')} title={t('pages.about.title', { name: site.name })} description={t('pages.about.description')} />
       <div className="mt-10 flex flex-col gap-6 text-lg leading-relaxed">
-        <p>{site.name} is a discovery platform for well-made gadgets and gear. Makers submit their products, and an editor reviews every submission before it’s published. Nothing appears on the site automatically.</p>
-        <h2 className="font-display text-2xl font-bold">How it works</h2>
+        <p>{t('pages.about.intro', { name: site.name })}</p>
+        <h2 className="font-display text-2xl font-bold">{t('pages.about.howItWorks')}</h2>
         <ul className="list-disc space-y-2 pl-6">
-          <li><strong>Editorial review.</strong> Editors check that a product is real, correctly described and linked to a working store.</li>
-          <li><strong>Independent scores.</strong> Editorial scores are written by our editors. Sellers can’t edit or buy them.</li>
-          <li><strong>We link, we don’t sell.</strong> “Buy now” takes you to the maker’s own site. We don’t take payments.</li>
-          <li><strong>Trending is earned.</strong> Rankings come from saves, collection adds, click-throughs, shares and views, weighted towards recent activity.</li>
+          {points.map(([title, body]) => (
+            <li key={title}><strong>{t(title)}</strong> {t(body)}</li>
+          ))}
         </ul>
-        <p>Makers can <Link href="/submit" className="underline">submit a product</Link> for free.</p>
-        <p className="text-base text-muted-foreground">All brands, products and articles currently shown are fictional demo content used to develop the platform.</p>
+        <p>
+          {t('pages.about.makersPrefix')} <Link href="/submit" className="underline">{t('pages.about.makersLink')}</Link>{t('pages.about.makersSuffix')}
+        </p>
+        <p className="text-base text-muted-foreground">{t('pages.about.demo')}</p>
       </div>
     </div>
   )

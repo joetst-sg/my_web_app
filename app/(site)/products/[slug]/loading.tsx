@@ -1,6 +1,9 @@
-export default function Loading() {
+import { getT } from '@/lib/i18n/server'
+
+export default async function Loading() {
+  const t = await getT()
   return (
-    <div className="container-page grid gap-10 py-10 lg:grid-cols-[1.15fr_1fr]" aria-busy="true" aria-label="Loading product">
+    <div className="container-page grid gap-10 py-10 lg:grid-cols-[1.15fr_1fr]" aria-busy="true" aria-label={t('common.loading')}>
       <div className="aspect-[4/3] animate-pulse rounded-3xl bg-muted" />
       <div className="flex flex-col gap-4">
         <div className="h-4 w-32 animate-pulse rounded bg-muted" />

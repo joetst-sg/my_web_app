@@ -1,8 +1,9 @@
-import Link from 'next/link'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import Link from '@/components/i18n/link'
+import { getT } from '@/lib/i18n/server'
 import { cn } from '@/lib/utils'
 
-export function Pagination({
+export async function Pagination({
   page,
   pageCount,
   hrefFor,
@@ -14,13 +15,14 @@ export function Pagination({
   className?: string
 }) {
   if (pageCount <= 1) return null
+  const t = await getT()
   const pages = new Set([1, pageCount, page - 1, page, page + 1].filter((p) => p >= 1 && p <= pageCount))
   const sorted = [...pages].sort((a, b) => a - b)
   const item = 'grid h-10 min-w-10 place-items-center rounded-lg px-3 text-sm font-medium'
   return (
-    <nav aria-label="Pagination" className={cn('flex items-center justify-center gap-1', className)}>
+    <nav aria-label={t('common.pagination')} className={cn('flex items-center justify-center gap-1', className)}>
       {page > 1 ? (
-        <Link href={hrefFor(page - 1)} className={cn(item, 'hover:bg-muted')} rel="prev" aria-label="Previous page">
+        <Link href={hrefFor(page - 1)} className={cn(item, 'hover:bg-muted')} rel="prev" aria-label={t('common.previousPage')}>
           <ChevronLeft className="size-4" />
         </Link>
       ) : (
@@ -34,12 +36,12 @@ export function Pagination({
           {p === page ? (
             <span aria-current="page" className={cn(item, 'bg-primary text-primary-foreground')}>{p}</span>
           ) : (
-            <Link href={hrefFor(p)} className={cn(item, 'hover:bg-muted')}>{p}</Link>
+            <Link href={hrefFor(p)} className={cn(item, 'hover:bg-muted')} aria-label={t('common.pageN', { n: p })}>{p}</Link>
           )}
         </span>
       ))}
       {page < pageCount ? (
-        <Link href={hrefFor(page + 1)} className={cn(item, 'hover:bg-muted')} rel="next" aria-label="Next page">
+        <Link href={hrefFor(page + 1)} className={cn(item, 'hover:bg-muted')} rel="next" aria-label={t('common.nextPage')}>
           <ChevronRight className="size-4" />
         </Link>
       ) : (

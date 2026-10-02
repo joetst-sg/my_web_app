@@ -1,16 +1,21 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
+import Link from '@/components/i18n/link'
 import { BarChart3 } from 'lucide-react'
 import { EmptyState } from '@/components/common/basics'
 import { DailyBarChart, lastNDays } from '@/components/common/bar-chart'
 import { requireViewer } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
+import { getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = { title: 'Seller analytics', robots: { index: false } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('seller.analytics.title'), robots: { index: false } }
+}
 
 export default async function SellerAnalyticsPage() {
   const viewer = await requireViewer('/seller/analytics')
   const supabase = await createClient()
+  const t = await getT()
   const [{ data: products }, { data: stats }] = await Promise.all([
     supabase.from('products').select('id, name, slug, view_count, click_count, save_count, share_count, collection_count').eq('seller_id', viewer.id).eq('status', 'published'),
     supabase.rpc('seller_product_stats', { days: 30 }),
@@ -18,8 +23,8 @@ export default async function SellerAnalyticsPage() {
   if (!products?.length) {
     return (
       <div>
-        <h1 className="font-display text-3xl font-bold sm:text-4xl">Analytics</h1>
-        <EmptyState className="mt-8" icon={BarChart3} title="No data yet" description="Analytics start once one of your products is published." />
+        <h1 className="font-display text-3xl font-bold sm:text-4xl">{t('seller.nav.analytics')}</h1>
+        <EmptyState className="mt-8" icon={BarChart3} title={t('seller.analytics.emptyTitle')} description={t('seller.analytics.emptyBody')} />
       </div>
     )
   }
@@ -35,18 +40,19 @@ export default async function SellerAnalyticsPage() {
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <h1 className="font-display text-3xl font-bold sm:text-4xl">Analytics</h1>
-        <p className="mt-1 text-muted-foreground">Views are counted once per visitor per 30 minutes. Outbound clicks are Buy Now clicks sent to your site.</p>
+        <h1 className="font-display text-3xl font-bold sm:text-4xl">{t('seller.nav.analytics')}</h1>
+        <p className="mt-1 text-muted-foreground">{t('seller.analytics.intro')}</p>
       </div>
       <section className="rounded-2xl border p-5">
-        <h2 className="mb-4 font-sans text-base font-semibold tracking-normal">Last 30 days</h2>
+        <h2 className="mb-4 font-sans text-base font-semibold tracking-normal">{t('seller.stats.last30')}</h2>
         <DailyBarChart
-          label="Daily views, outbound clicks and saves for your products"
+          label={t('seller.analytics.chartLabel')}
+          dayLabel={t('seller.stats.day')}
           data={days.map((day) => ({ day, values: byDay.get(day) ?? {} }))}
           series={[
-            { key: 'views', label: 'Views', color: 'var(--chart-2)' },
-            { key: 'clicks', label: 'Outbound clicks', color: 'var(--chart-1)' },
-            { key: 'saves', label: 'Saves', color: 'var(--chart-3)' },
+            { key: 'views', label: t('seller.stats.views'), color: 'var(--chart-2)' },
+            { key: 'clicks', label: t('seller.stats.clicks'), color: 'var(--chart-1)' },
+            { key: 'saves', label: t('seller.stats.saves'), color: 'var(--chart-3)' },
           ]}
         />
       </section>
@@ -54,14 +60,14 @@ export default async function SellerAnalyticsPage() {
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-surface text-left text-xs text-muted-foreground">
             <tr>
-              <th className="p-4 font-medium">Product</th>
-              <th className="p-4 text-right font-medium">Views (30d)</th>
-              <th className="p-4 text-right font-medium">Clicks (30d)</th>
-              <th className="p-4 text-right font-medium">Conversion</th>
-              <th className="p-4 text-right font-medium">All-time views</th>
-              <th className="p-4 text-right font-medium">Saves</th>
-              <th className="p-4 text-right font-medium">In collections</th>
-              <th className="p-4 text-right font-medium">Shares</th>
+              <th className="p-4 font-medium">{t('seller.stats.product')}</th>
+              <th className="p-4 text-right font-medium">{t('seller.analytics.views30')}</th>
+              <th className="p-4 text-right font-medium">{t('seller.analytics.clicks30')}</th>
+              <th className="p-4 text-right font-medium">{t('seller.analytics.conversion')}</th>
+              <th className="p-4 text-right font-medium">{t('seller.analytics.allTime')}</th>
+              <th className="p-4 text-right font-medium">{t('seller.stats.saves')}</th>
+              <th className="p-4 text-right font-medium">{t('seller.analytics.inCollections')}</th>
+              <th className="p-4 text-right font-medium">{t('seller.analytics.shares')}</th>
             </tr>
           </thead>
           <tbody className="divide-y tabular-nums">

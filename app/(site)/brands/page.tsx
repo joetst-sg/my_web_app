@@ -2,15 +2,16 @@ import type { Metadata } from 'next'
 import { PageHeader } from '@/components/common/basics'
 import { BrandCard } from '@/components/common/cards'
 import { createClient } from '@/lib/supabase/server'
+import { alternatesFor, getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = {
-  title: 'Brands',
-  description: 'The makers behind the products on Loupe. Follow brands to see their new launches first.',
-  alternates: { canonical: '/brands' },
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('nav.brands'), description: t('pages.brands.meta'), alternates: await alternatesFor('/brands') }
 }
 
 export default async function BrandsPage() {
   const supabase = await createClient()
+  const t = await getT()
   const [{ data: brands }, { data: counts }] = await Promise.all([
     supabase.from('brands').select('id, slug, name, tagline, logo_url, is_verified, follower_count').eq('is_published', true).order('name'),
     supabase.from('products').select('brand_id').eq('status', 'published'),
@@ -24,8 +25,8 @@ export default async function BrandsPage() {
   }
   return (
     <div className="container-page py-10">
-      <PageHeader eyebrow="Makers" title="Brands" description={`${brands?.length ?? 0} brands with products reviewed by our editors.`} className="mb-10" />
-      <nav aria-label="Jump to letter" className="mb-8 flex flex-wrap gap-1">
+      <PageHeader eyebrow={t('pages.brands.eyebrow')} title={t('nav.brands')} description={t('pages.brands.description', { count: brands?.length ?? 0 })} className="mb-10" />
+      <nav aria-label={t('pages.brands.jump')} className="mb-8 flex flex-wrap gap-1">
         {[...groups.keys()].map((l) => (
           <a key={l} href={`#letter-${l}`} className="grid size-9 place-items-center rounded-lg text-sm font-semibold hover:bg-muted">{l}</a>
         ))}

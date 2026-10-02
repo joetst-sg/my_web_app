@@ -14,7 +14,7 @@ export default async function AdminCategoriesPage() {
   const viewer = await getViewer()
   const supabase = await createClient()
   const [{ data: cats }, { data: links }] = await Promise.all([
-    supabase.from('categories').select('id, slug, name, description, parent_id, color, icon, seo_title, seo_description, is_featured, sort_order, follower_count').order('sort_order'),
+    supabase.from('categories').select('id, slug, name, description, parent_id, color, icon, seo_title, seo_description, is_featured, sort_order, follower_count, translations').order('sort_order'),
     supabase.from('product_categories').select('category_id'),
   ])
   const all = cats ?? []

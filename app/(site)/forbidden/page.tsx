@@ -1,15 +1,20 @@
 import type { Metadata } from 'next'
-import Link from 'next/link'
 import { ShieldAlert } from 'lucide-react'
+import Link from '@/components/i18n/link'
 import { EmptyState } from '@/components/common/basics'
 import { Button } from '@/components/ui/button'
+import { getT } from '@/lib/i18n/server'
 
-export const metadata: Metadata = { title: 'No access', robots: { index: false } }
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getT()
+  return { title: t('pages.forbidden.metaTitle'), robots: { index: false } }
+}
 
-export default function ForbiddenPage() {
+export default async function ForbiddenPage() {
+  const t = await getT()
   return (
     <div className="container-page py-20">
-      <EmptyState icon={ShieldAlert} title="You don't have permission to view this page." description="This area is for Loupe editors and administrators." action={<Button asChild><Link href="/">Go to the homepage</Link></Button>} />
+      <EmptyState icon={ShieldAlert} title={t('pages.forbidden.title')} description={t('pages.forbidden.description')} action={<Button asChild><Link href="/">{t('pages.forbidden.home')}</Link></Button>} />
     </div>
   )
 }
