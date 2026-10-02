@@ -8,6 +8,7 @@ import { greenFundingConfig } from '@/lib/greenfunding/config'
 import { backfillSummaries, runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
 import { sourceContentHash, translationSource } from '@/lib/greenfunding/content'
 import { campaignIdFromUrl, validateCampaignUrl } from '@/lib/greenfunding/url'
+import { publishImport } from '@/lib/greenfunding/publish'
 import { createServiceClient } from '@/lib/supabase/server'
 import { processTranslationQueue, translateProductNow, type QueueResult } from '@/lib/translation/queue'
 
@@ -65,30 +66,9 @@ export async function approveAndPublish(productId: string): Promise<ActionResult
   const a = await admin()
   if (!a.ok) return a
   if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
-  const config = greenFundingConfig()
-  if (config.mode !== 'production') return { ok: false, error: 'Test mode: publishing is disabled. Set GREEN_FUNDING_IMPORT_MODE=production to publish.' }
-  const { db, viewer } = a
-  const { meta, product, hasCategory } = await loadImport(db, productId)
-  if (!meta || !product) return { ok: false, error: 'This is not an imported GREEN FUNDING product.' }
-
-  // Buy Now must go to the exact imported campaign URL, on an authorized domain.
-  const check = validateCampaignUrl(meta.source_url, config.allowedDomains)
-  if (!check.ok) return { ok: false, error: `Campaign URL rejected: ${check.reason}` }
-  if (product.external_url !== meta.source_url) return { ok: false, error: 'The Buy Now URL does not match the imported campaign URL. Fix the campaign URL first.' }
-  if (!meta.translated_content_hash) return { ok: false, error: 'Translations are not ready yet.' }
-  const zh = (product.translations as Record<string, Record<string, string>> | null)?.['zh-HK']
-  if (!product.name || !zh?.name) return { ok: false, error: 'English and Traditional Chinese titles are both required.' }
-  if (!hasCategory) return { ok: false, error: 'Choose a category before publishing.' }
-  if (['ended', 'cancelled'].includes(meta.source_status)) return { ok: false, error: `The campaign is ${meta.source_status} on GREEN FUNDING.` }
-
-  const now = new Date().toISOString()
-  const { error } = await db.from('products').update({ status: 'published', published_at: now, availability: 'crowdfunding' }).eq('id', productId)
-  if (error) return { ok: false, error: error.message }
-  if (product.brand_id) await db.from('brands').update({ is_published: true }).eq('id', product.brand_id)
-  await db.from('product_source_metadata').update({ pipeline_status: 'published', reviewed_by: viewer.id, reviewed_at: now, update_available: false, changed_fields: [] }).eq('id', meta.id)
-  await logSync(db, { operation: 'publish', status: 'success', campaignId: meta.source_campaign_id, campaignUrl: meta.source_url, productId, message: `Approved and published by ${viewer.email}` })
-  await audit(db, viewer.id, 'greenfunding.publish', productId)
-  refresh(product.slug)
+  const res = await publishImport(a.db, productId, { kind: 'admin', id: a.viewer.id, email: a.viewer.email })
+  if (!res.ok) return res
+  refresh(res.slug)
   return { ok: true, message: 'Published in English and Traditional Chinese.' }
 }
 

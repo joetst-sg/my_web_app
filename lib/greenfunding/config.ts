@@ -18,6 +18,8 @@ export function greenFundingConfig() {
   return {
     // "test" imports and translates but can never publish. Default: test.
     mode: (process.env.GREEN_FUNDING_IMPORT_MODE === 'production' ? 'production' : 'test') as ImportMode,
+    // Publish as soon as translations are ready (production mode only), instead of waiting for review.
+    autoPublish: process.env.GREEN_FUNDING_AUTO_PUBLISH === 'true',
     // Which data source implementation to use (see lib/greenfunding/sources).
     source: (process.env.GREEN_FUNDING_SOURCE ?? 'html').trim(),
     baseUrl: (process.env.GREEN_FUNDING_BASE_URL ?? 'https://greenfunding.jp').replace(/\/$/, ''),

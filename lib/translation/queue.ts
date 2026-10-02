@@ -4,6 +4,7 @@ import { logSync } from '@/lib/greenfunding/sync'
 import { applyTranslationAutomatically, nextAttempt, pipelineAfterTranslation } from '@/lib/greenfunding/decide'
 import { createServiceClient } from '@/lib/supabase/server'
 import { greenFundingConfig } from '@/lib/greenfunding/config'
+import { autoPublishIfEnabled } from '@/lib/greenfunding/publish'
 import { translationSource } from '@/lib/greenfunding/content'
 import { createTranslator, translationConfig } from './index'
 import { TranslationError, type TargetLanguage, type TranslationOutput, type TranslationProvider } from './types'
@@ -130,6 +131,8 @@ export async function processTranslationJob(
       })
       .eq('id', meta.id)
     await db.from('translation_jobs').update({ status: 'succeeded', attempts: job.attempts + 1, finished_at: new Date().toISOString(), last_error: null }).eq('id', job.id)
+    // Newly translated products go live straight away when automatic publishing is on.
+    if (applied && product.status !== 'published' && !['rejected', 'archived'].includes(meta.pipeline_status)) await autoPublishIfEnabled(db, job.product_id)
     await logSync(db, { ...log, status: 'success', message: applied ? `English and Traditional Chinese generated (${translator.model})` : `New AI translation saved as a version for review (not applied: ${product.status === 'published' ? 'product is published' : 'admin-edited text'})`, durationMs: Date.now() - started })
     return 'succeeded' as const
   } catch (e) {

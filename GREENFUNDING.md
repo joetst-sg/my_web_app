@@ -69,9 +69,20 @@ The import record (`product_source_metadata.pipeline_status`) goes
 `draft`/`pending_review` (invisible to the public through row-level security)
 until an admin clicks **Approve & Publish**.
 
+### Automatic publishing
+
+With `GREEN_FUNDING_IMPORT_MODE=production` and `GREEN_FUNDING_AUTO_PUBLISH=true`,
+a product is published as soon as its translation is applied — no manual
+review. The same checks as **Approve & Publish** run first (valid campaign URL
+on an allowed domain, Buy Now = imported URL, English and Chinese titles,
+campaign not ended/cancelled); a product that fails stays in review with the
+reason in its card and the sync log. Uncategorized products are published but
+flagged “Uncategorized” for you to fix. Use `GREEN_FUNDING_EXCLUDED_CATEGORIES`
+(e.g. `アイドル`) to keep unwanted campaign types out entirely.
+
 ### Safety rules built in
 
-- Test mode (`GREEN_FUNDING_IMPORT_MODE=test`, the default) can never publish.
+- Test mode (`GREEN_FUNDING_IMPORT_MODE=test`, the default) can never publish, even with auto-publish on.
 - Publishing requires: valid HTTPS URL on an allowed domain, Buy Now URL equal
   to the imported campaign URL, English and Chinese titles, a category, and a
   campaign that hasn't ended.

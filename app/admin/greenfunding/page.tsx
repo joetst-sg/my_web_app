@@ -77,7 +77,9 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
           <p className="eyebrow">Import</p>
           <h1 className="font-display text-3xl font-bold">GREEN FUNDING</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            New campaigns are imported as hidden drafts, translated to English and Traditional Chinese, and wait here for review. Nothing is public until you approve it.
+            {config.mode === 'production' && config.autoPublish
+              ? 'New campaigns are imported, translated to English and Traditional Chinese, and published automatically once the safety checks pass. Anything that fails a check waits here for review.'
+              : 'New campaigns are imported as hidden drafts, translated to English and Traditional Chinese, and wait here for review. Nothing is public until you approve it.'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -89,7 +91,7 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
 
       <div className={cn('rounded-2xl border p-4 text-sm', config.mode === 'test' ? 'border-[oklch(0.8_0.12_80)] bg-[oklch(0.97_0.04_85)]' : 'bg-surface')}>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-          <span><strong>Mode:</strong> {config.mode === 'test' ? 'TEST — imports and translates, never publishes' : 'Production'}</span>
+          <span><strong>Mode:</strong> {config.mode === 'test' ? 'TEST — imports and translates, never publishes' : config.autoPublish ? 'Production · auto-publish ON (published as soon as translated)' : 'Production · manual review'}</span>
           <span><strong>Last sync:</strong> {lastRun ? `${fmtDate(lastRun.finished_at ?? lastRun.started_at)} (${lastRun.status})` : 'never'}</span>
           <span><strong>Next sync:</strong> {nextSync ? `≈ ${fmtDate(nextSync)}` : 'on the next scheduler tick'} · every {config.syncIntervalMinutes} min</span>
           <span><strong>Translation:</strong> {tconfig.apiKey ? `${tconfig.provider} · ${tconfig.model}` : <span className="text-destructive">no TRANSLATION_API_KEY set</span>}</span>

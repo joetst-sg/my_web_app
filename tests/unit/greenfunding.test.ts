@@ -76,6 +76,14 @@ describe('campaign URL validation', () => {
     vi.unstubAllEnvs()
     expect(greenFundingConfig().allowedDomains).toEqual(DOMAINS)
   })
+  it('auto-publish is off by default and only switched on explicitly', () => {
+    expect(greenFundingConfig().autoPublish).toBe(false)
+    vi.stubEnv('GREEN_FUNDING_AUTO_PUBLISH', 'yes')
+    expect(greenFundingConfig().autoPublish).toBe(false)
+    vi.stubEnv('GREEN_FUNDING_AUTO_PUBLISH', 'true')
+    expect(greenFundingConfig().autoPublish).toBe(true)
+    vi.unstubAllEnvs()
+  })
   it('defaults to test mode and a configurable interval', () => {
     vi.stubEnv('GREEN_FUNDING_SYNC_INTERVAL_MINUTES', '45')
     expect(greenFundingConfig()).toMatchObject({ mode: 'test', syncIntervalMinutes: 45 })
@@ -584,5 +592,57 @@ describe('machine translation spacing clean-up', () => {
     expect(tidySpacing("LG 's AI -powered Styler ™")).toBe("LG's AI-powered Styler™")
     expect(tidySpacing('精緻的五合一保護套“ Trinity ”')).toBe('精緻的五合一保護套“Trinity”')
     expect(tidySpacing('a - b')).toBe('a - b')
+  })
+})
+
+
+describe('publishing rules', () => {
+  beforeEach(() => vi.resetModules())
+  const db = (meta: Record<string, unknown>, product: Record<string, unknown>, cats: unknown[] = []) => {
+    const updates: string[] = []
+    const table = (name: string) => {
+      const q: Record<string, unknown> = {}
+      const chain = () => q
+      Object.assign(q, {
+        select: chain, eq: chain, insert: async () => ({ error: null }),
+        update: () => { updates.push(name); return { eq: async () => ({ error: null }) } },
+        maybeSingle: async () => ({ data: name === 'products' ? product : meta }),
+        then: (r: (v: unknown) => void) => r({ data: cats }),
+      })
+      return q
+    }
+    return { db: { from: table } as never, updates }
+  }
+  const meta = { id: 'm', source_url: 'https://greenfunding.jp/lab/projects/1', source_campaign_id: '1', source_status: 'active', translated_content_hash: 'h' }
+  const product = { id: 'p', slug: 's', name: 'Name', status: 'pending_review', external_url: 'https://greenfunding.jp/lab/projects/1', brand_id: null, translations: { 'zh-HK': { name: '名稱' } } }
+
+  it('never publishes in test mode', async () => {
+    const { publishImport } = await import('@/lib/greenfunding/publish')
+    const res = await publishImport(db(meta, product).db, 'p', { kind: 'auto' })
+    expect(res).toMatchObject({ ok: false, error: expect.stringMatching(/Test mode/) })
+  })
+  it('auto-publishes uncategorized products in production; manual approval still needs a category', async () => {
+    vi.stubEnv('GREEN_FUNDING_IMPORT_MODE', 'production')
+    const { publishImport } = await import('@/lib/greenfunding/publish')
+    const auto = db(meta, product)
+    expect(await publishImport(auto.db, 'p', { kind: 'auto' })).toEqual({ ok: true, slug: 's' })
+    expect(auto.updates).toContain('products')
+    expect(await publishImport(db(meta, product).db, 'p', { kind: 'admin', id: 'a', email: 'x' })).toMatchObject({ ok: false, error: expect.stringMatching(/category/) })
+    vi.unstubAllEnvs()
+  })
+  it('refuses a mismatched Buy Now URL, missing Chinese title or ended campaign', async () => {
+    vi.stubEnv('GREEN_FUNDING_IMPORT_MODE', 'production')
+    const { publishImport } = await import('@/lib/greenfunding/publish')
+    expect((await publishImport(db(meta, { ...product, external_url: 'https://greenfunding.jp/lab/projects/2' }).db, 'p', { kind: 'auto' })).ok).toBe(false)
+    expect((await publishImport(db(meta, { ...product, translations: {} }).db, 'p', { kind: 'auto' })).ok).toBe(false)
+    expect((await publishImport(db({ ...meta, source_status: 'ended' }, product).db, 'p', { kind: 'auto' })).ok).toBe(false)
+    expect((await publishImport(db({ ...meta, source_url: 'https://evil.example/lab/projects/1' }, { ...product, external_url: 'https://evil.example/lab/projects/1' }).db, 'p', { kind: 'auto' })).ok).toBe(false)
+    vi.unstubAllEnvs()
+  })
+  it('does nothing when auto-publish is off', async () => {
+    vi.stubEnv('GREEN_FUNDING_IMPORT_MODE', 'production')
+    const { autoPublishIfEnabled } = await import('@/lib/greenfunding/publish')
+    expect(await autoPublishIfEnabled(db(meta, product).db, 'p')).toBeNull()
+    vi.unstubAllEnvs()
   })
 })

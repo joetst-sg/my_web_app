@@ -43,7 +43,7 @@ export async function Hero({ product, isSaved }: { product: ProductCardData; isS
             <Link href={`/brands/${p.brand_slug}`} className="text-sm font-medium text-muted-foreground hover:text-foreground">
               {p.brand_name}
             </Link>
-            <h1 id="hero-title" className="mt-1 font-display text-4xl font-bold leading-[1.05] sm:text-5xl xl:text-6xl">
+            <h1 id="hero-title" className="mt-1 line-clamp-3 font-display text-2xl font-bold leading-tight sm:text-3xl xl:text-4xl">
               <Link href={`/products/${p.slug}`} className="hover:underline hover:decoration-2 hover:underline-offset-8">{p.name}</Link>
             </h1>
             {p.tagline && <p className="mt-4 max-w-md text-lg text-muted-foreground">{p.tagline}</p>}
