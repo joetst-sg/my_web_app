@@ -51,6 +51,7 @@ export default async function AdminProductPage({ params }: PageProps<'/admin/pro
           name: product.name,
           slug: product.slug,
           tagline: product.tagline,
+          translations: product.translations,
           description: product.description,
           external_url: product.external_url,
           price: product.price === null ? null : Number(product.price),

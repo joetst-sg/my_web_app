@@ -1338,6 +1338,7 @@ export type Database = {
           slug: string
           status: Database["public"]["Enums"]["product_status"]
           tagline: string | null
+          translations: Json
           trending_rank: number | null
           updated_at: string
           view_count: number
@@ -1373,6 +1374,7 @@ export type Database = {
           slug: string
           status?: Database["public"]["Enums"]["product_status"]
           tagline?: string | null
+          translations?: Json
           trending_rank?: number | null
           updated_at?: string
           view_count?: number
@@ -1408,6 +1410,7 @@ export type Database = {
           slug?: string
           status?: Database["public"]["Enums"]["product_status"]
           tagline?: string | null
+          translations?: Json
           trending_rank?: number | null
           updated_at?: string
           view_count?: number
@@ -1910,6 +1913,7 @@ export type Database = {
           name: string | null
           original_price: number | null
           product_id: string | null
+          product_translations: Json | null
           score: number | null
           slug: string | null
           starts_at: string | null
@@ -1948,6 +1952,7 @@ export type Database = {
           name: string | null
           popularity_score: number | null
           price: number | null
+          product_translations: Json | null
           published_at: string | null
           save_count: number | null
           score: number | null

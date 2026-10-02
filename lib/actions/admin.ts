@@ -98,6 +98,11 @@ const productEditSchema = z.object({
   seo_title: z.string().trim().max(70).optional().transform((v) => v || null),
   seo_description: z.string().trim().max(170).optional().transform((v) => v || null),
   category_id: uuid.optional().or(z.literal('').transform(() => undefined)),
+  zh_name: z.string().trim().max(120).optional(),
+  zh_tagline: z.string().trim().max(200).optional(),
+  zh_description: z.string().trim().max(20000).optional(),
+  zh_seo_title: z.string().trim().max(70).optional(),
+  zh_seo_description: z.string().trim().max(170).optional(),
 })
 
 export async function updateProductAdmin(productId: string, input: z.input<typeof productEditSchema>): Promise<ActionResult> {
@@ -106,8 +111,9 @@ export async function updateProductAdmin(productId: string, input: z.input<typeo
   if (!parsed.success) return { ok: false, error: 'Please fix the highlighted fields.', fieldErrors: fieldMsgs(parsed.error.flatten().fieldErrors) }
   const { supabase, ok } = await staff()
   if (!ok) return { ok: false, error: FORBIDDEN }
-  const { category_id, ...fields } = parsed.data
-  const { error } = await supabase.from('products').update(fields).eq('id', productId)
+  const { category_id, zh_name, zh_tagline, zh_description, zh_seo_title, zh_seo_description, ...fields } = parsed.data
+  const translations = zhTranslations({ name: zh_name, tagline: zh_tagline, description: zh_description, seo_title: zh_seo_title, seo_description: zh_seo_description })
+  const { error } = await supabase.from('products').update({ ...fields, ...(translations && { translations }) }).eq('id', productId)
   if (error) return { ok: false, error: error.code === '23505' ? 'That URL slug is already used by another product.' : friendlyError(error) }
   if (category_id) {
     await supabase.from('product_categories').update({ is_primary: false }).eq('product_id', productId)

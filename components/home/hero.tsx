@@ -3,15 +3,16 @@ import Link from '@/components/i18n/link'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { productImageUrl } from '@/lib/images'
-import { fromTranslations } from '@/lib/i18n/content'
+import { fromTranslations, localizeCard } from '@/lib/i18n/content'
 import { getI18n } from '@/lib/i18n/server'
 import type { ProductCardData } from '@/lib/db/products'
 import { BuyButton } from '@/components/product/buy-button'
 import { DiscountBadge, PriceDisplay, RatingBadge } from '@/components/product/price'
 import { SaveButton } from '@/components/product/save-button'
 
-export async function Hero({ product: p, isSaved }: { product: ProductCardData; isSaved: boolean }) {
+export async function Hero({ product, isSaved }: { product: ProductCardData; isSaved: boolean }) {
   const { t, locale } = await getI18n()
+  const p = localizeCard(product, locale)
   const img = productImageUrl(p.image_path)
   return (
     <section aria-labelledby="hero-title" className="container-page pt-6 sm:pt-10">

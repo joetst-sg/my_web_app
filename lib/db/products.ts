@@ -7,14 +7,14 @@ import type { Database } from '@/lib/supabase/database.types'
 export type ProductCardRow = Database['public']['Views']['product_cards']['Row']
 
 export const CARD_COLUMNS =
-  'id, slug, name, tagline, currency, price, compare_at_price, discount_percent, availability, status, brand_name, brand_slug, category_name, category_slug, image_path, image_alt, score, is_featured, is_new, is_trending, trending_rank, deal_id, deal_ends_at, published_at, save_count, popularity_score, category_translations' as const
+  'id, slug, name, tagline, currency, price, compare_at_price, discount_percent, availability, status, brand_name, brand_slug, category_name, category_slug, image_path, image_alt, score, is_featured, is_new, is_trending, trending_rank, deal_id, deal_ends_at, published_at, save_count, popularity_score, category_translations, product_translations' as const
 
 export type ProductCardData = Pick<
   ProductCardRow,
   | 'id' | 'slug' | 'name' | 'tagline' | 'currency' | 'price' | 'compare_at_price' | 'discount_percent' | 'availability' | 'status'
   | 'brand_name' | 'brand_slug' | 'category_name' | 'category_slug' | 'image_path' | 'image_alt' | 'score' | 'is_featured'
   | 'is_new' | 'is_trending' | 'trending_rank' | 'deal_id' | 'deal_ends_at' | 'published_at' | 'save_count' | 'popularity_score'
-  | 'category_translations'
+  | 'category_translations' | 'product_translations'
 >
 
 export { sortOptions, filterSchema, parseFilters, filtersToSearchParams, type ProductFilters } from '@/lib/filters'
@@ -163,7 +163,7 @@ export const getProductBySlug = cache(async (slug: string) => {
     supabase
       .from('products')
       .select(`
-      id, slug, name, tagline, description, key_features, benefits, external_url, sku, currency, price, original_price,
+      id, slug, name, tagline, description, translations, key_features, benefits, external_url, sku, currency, price, original_price,
       availability, status, published_at, updated_at, seller_id, seo_title, seo_description, save_count, view_count,
       brand:brands ( id, slug, name, tagline, description, logo_url, website_url, social_links, is_verified, follower_count ),
       images:product_images ( id, storage_path, alt, width, height, position ),

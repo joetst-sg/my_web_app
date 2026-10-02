@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 import { dealCards } from '@/lib/db/content'
 import { alternatesFor, getI18n } from '@/lib/i18n/server'
 import type { MessageKey } from '@/lib/i18n/translate'
-import { fromTranslations } from '@/lib/i18n/content'
+import { fromTranslations, localizeCard } from '@/lib/i18n/content'
 import { productImageUrl } from '@/lib/images'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -23,7 +23,7 @@ export default async function DealsPage({ searchParams }: PageProps<'/deals'>) {
   const { t, f, locale } = await getI18n()
   const status = (statuses.find(([s]) => s === sp.status)?.[0] ?? 'active') as 'active' | 'upcoming' | 'expired'
   const category = typeof sp.category === 'string' && /^[a-z0-9-]+$/.test(sp.category) ? sp.category : undefined
-  const deals = await dealCards({ status, category, limit: 60 })
+  const deals = (await dealCards({ status, category, limit: 60 })).map((d) => localizeCard(d, locale))
   const categories = [...new Map((await dealCards({ status, limit: 200 })).map((d) => [d.category_slug, fromTranslations(d.category_translations, 'name', locale, d.category_name)])).entries()]
 
   return (

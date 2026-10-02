@@ -17,3 +17,25 @@ export function fromTranslations(translations: unknown, field: string, locale: L
   const tr = (translations as Record<string, Record<string, string>> | null)?.[locale]?.[field]
   return tr && tr.trim() ? tr : english ?? ''
 }
+
+const PRODUCT_FIELDS = ['name', 'tagline', 'description', 'seo_title', 'seo_description'] as const
+type ProductText = Partial<Record<(typeof PRODUCT_FIELDS)[number], string | null>>
+
+// A product row with its translatable text swapped for the locale's version
+// (from products.translations), field by field, falling back to English.
+export function localizeProduct<T extends ProductText & { translations?: unknown }>(p: T, locale: Locale): T {
+  if (locale === 'en') return p
+  const out = { ...p }
+  for (const f of PRODUCT_FIELDS) if (f in p) (out as ProductText)[f] = fromTranslations(p.translations, f, locale, p[f]) || null
+  return out
+}
+
+// Same for product card rows, whose translations column is product_translations.
+export function localizeCard<T extends { name: string | null; tagline: string | null; product_translations?: unknown }>(c: T, locale: Locale): T {
+  if (locale === 'en') return c
+  return {
+    ...c,
+    name: fromTranslations(c.product_translations, 'name', locale, c.name) || null,
+    tagline: fromTranslations(c.product_translations, 'tagline', locale, c.tagline) || null,
+  }
+}

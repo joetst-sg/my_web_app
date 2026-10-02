@@ -15,7 +15,7 @@ import { formatDate, formatPrice } from '@/lib/format'
 
 type Product = {
   id: string; name: string; slug: string; tagline: string | null; description: string | null; external_url: string | null
-  price: number | null; original_price: number | null; currency: string; availability: string; seo_title: string | null; seo_description: string | null
+  price: number | null; original_price: number | null; currency: string; availability: string; seo_title: string | null; seo_description: string | null; translations?: unknown
   category_id: string | null
 }
 type Score = { overall: number; design: number | null; innovation: number | null; usability: number | null; value: number | null; features: number | null; verdict: string | null } | null
@@ -56,6 +56,7 @@ export function ProductEditor({
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const zh = (f: string) => (product.translations as Record<string, Record<string, string>> | undefined)?.['zh-HK']?.[f] ?? ''
   const [v, setV] = useState({
     name: product.name,
     slug: product.slug,
@@ -69,6 +70,11 @@ export function ProductEditor({
     seo_title: product.seo_title ?? '',
     seo_description: product.seo_description ?? '',
     category_id: product.category_id ?? '',
+    zh_name: zh('name'),
+    zh_tagline: zh('tagline'),
+    zh_description: zh('description'),
+    zh_seo_title: zh('seo_title'),
+    zh_seo_description: zh('seo_description'),
   })
   const [errors, setErrors] = useState<Record<string, string[] | undefined>>({})
   const [s, setS] = useState({
@@ -149,6 +155,18 @@ export function ProductEditor({
           </div>
           {field('seo_title', `SEO title (${v.seo_title.length}/70)`, { maxLength: 70 })}
           {field('seo_description', `SEO description (${v.seo_description.length}/170)`, { maxLength: 170 })}
+          <fieldset className="flex flex-col gap-4 rounded-xl border p-4" lang="zh-HK">
+            <legend className="px-1 text-sm font-semibold">繁體中文 (Traditional Chinese)</legend>
+            <p className="text-xs text-muted-foreground">Shown on /zh pages. Leave a field empty to show the English text instead.</p>
+            {field('zh_name', 'Name (中文)', { maxLength: 120 })}
+            {field('zh_tagline', 'Short description (中文)', { maxLength: 200 })}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="p-zh_description">Full description (中文)</Label>
+              <Textarea id="p-zh_description" rows={8} value={v.zh_description} onChange={(e) => setV({ ...v, zh_description: e.target.value })} />
+            </div>
+            {field('zh_seo_title', `SEO title (中文) (${v.zh_seo_title.length}/70)`, { maxLength: 70 })}
+            {field('zh_seo_description', `SEO description (中文) (${v.zh_seo_description.length}/170)`, { maxLength: 170 })}
+          </fieldset>
           <Button type="submit" className="self-start" disabled={pending}>{pending && <Loader2 className="animate-spin" />}Save product</Button>
         </form>
       </Section>

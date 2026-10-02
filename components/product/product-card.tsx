@@ -1,7 +1,7 @@
 import Image from 'next/image'
 import Link from '@/components/i18n/link'
 import { cn } from '@/lib/utils'
-import { fromTranslations } from '@/lib/i18n/content'
+import { fromTranslations, localizeCard } from '@/lib/i18n/content'
 import { getI18n } from '@/lib/i18n/server'
 import type { MessageKey } from '@/lib/i18n/translate'
 import { productImageUrl } from '@/lib/images'
@@ -24,7 +24,7 @@ export type ProductCardProps = {
 }
 
 export async function ProductCard({
-  product: p,
+  product,
   isSaved = false,
   hasReminder = false,
   showSave = true,
@@ -36,6 +36,7 @@ export async function ProductCard({
   className,
 }: ProductCardProps) {
   const { t, locale } = await getI18n()
+  const p = localizeCard(product, locale)
   const img = productImageUrl(p.image_path)
   const flag =
     p.availability && p.availability !== 'available'

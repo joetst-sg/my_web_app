@@ -13,6 +13,7 @@ import { collectionsContainingProduct } from '@/lib/db/content'
 import { toProductView } from '@/lib/db/product-view'
 import { getProductBySlug, productsByIds } from '@/lib/db/products'
 import { localizePath } from '@/lib/i18n/config'
+import { localizeProduct } from '@/lib/i18n/content'
 import { alternatesFor, getI18n } from '@/lib/i18n/server'
 import type { MessageKey } from '@/lib/i18n/translate'
 import { productImageUrl } from '@/lib/images'
@@ -21,7 +22,8 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function generateMetadata({ params }: PageProps<'/products/[slug]'>): Promise<Metadata> {
   const { slug } = await params
-  const [p, { t }] = await Promise.all([getProductBySlug(slug), getI18n()])
+  const [raw, { t, locale }] = await Promise.all([getProductBySlug(slug), getI18n()])
+  const p = raw && localizeProduct(raw, locale)
   if (!p || p.status !== 'published') return { title: t('productPage.notFound'), robots: { index: false } }
   const title = p.seo_title || (p.brand ? t('productPage.titleWithBrand', { name: p.name, brand: p.brand.name }) : p.name)
   const description = p.seo_description || p.tagline || undefined
@@ -44,10 +46,11 @@ export async function generateMetadata({ params }: PageProps<'/products/[slug]'>
 
 export default async function ProductPage({ params }: PageProps<'/products/[slug]'>) {
   const { slug } = await params
-  const [product, { t, locale }] = await Promise.all([getProductBySlug(slug), getI18n()])
+  const [raw, { t, locale }] = await Promise.all([getProductBySlug(slug), getI18n()])
   // Unpublished products are visible only to their seller and staff (RLS);
   // they get a notice so it's clear the public can't see them yet.
-  if (!product) notFound()
+  if (!raw) notFound()
+  const product = localizeProduct(raw, locale)
 
   const view = toProductView(product, locale)
   const viewer = await getViewer()
