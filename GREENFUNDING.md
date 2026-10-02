@@ -31,7 +31,7 @@ Visitor ──► Buy now ──► /go/product/<id> ──► 302 to the stored
 | Page parser | `lib/greenfunding/parse.ts` (Open Graph, schema.org JSON-LD, campaign dashboard) |
 | Sync service | `lib/greenfunding/sync.ts` |
 | Images | `lib/greenfunding/images.ts` → bucket `greenfunding-products/campaign-<id>/` |
-| Translation | `lib/translation/` — provider interface, Anthropic provider, queue |
+| Translation | `lib/translation/` — provider interface; Google, Azure (shared `machine.ts`) and Anthropic providers; queue |
 | Admin | `/admin/greenfunding`, `/admin/greenfunding/<product id>`, `/admin/greenfunding/logs` |
 | Database | migrations `20261004000014_greenfunding.sql`, `20261004000015_campaign_info.sql` |
 
@@ -78,7 +78,11 @@ until an admin clicks **Approve & Publish**.
    run `supabase/migrations/20261004000014_greenfunding.sql` and
    `20261004000015_campaign_info.sql` in order.
 2. **Vercel environment variables** (Production): see `.env.example`. At minimum:
-   - `TRANSLATION_API_KEY` — an Anthropic API key (console.anthropic.com).
+   - Google (free 500k characters/month): `TRANSLATION_PROVIDER=google`,
+     `TRANSLATION_API_KEY` = an API key restricted to the Cloud Translation API.
+   - Or Azure (free tier): `TRANSLATION_PROVIDER=azure`, `TRANSLATION_API_KEY` = the
+     Translator resource's KEY 1, `AZURE_TRANSLATOR_REGION` = its Location/Region.
+   - Or Anthropic: `TRANSLATION_PROVIDER=anthropic`, `TRANSLATION_API_KEY` = an `sk-ant-…` key.
    - `GREEN_FUNDING_IMPORT_MODE=test` until the review flow is confirmed.
    - `SUPABASE_SERVICE_ROLE_KEY` and `CRON_SECRET` already exist.
 3. **Point the scheduler at the site** (SQL editor, once):
@@ -101,6 +105,21 @@ until an admin clicks **Approve & Publish**.
 5. When satisfied, set `GREEN_FUNDING_IMPORT_MODE=production`, redeploy, and
    use **Approve & Publish**. Check the product at `/products/<slug>` and
    `/zh/products/<slug>`, then click Buy now — it must open the campaign.
+
+## Translation providers
+
+| | Google Cloud Translation (`google`) | Azure AI Translator (`azure`) | Anthropic Claude (`anthropic`) |
+| --- | --- | --- | --- |
+| Cost | First 500k characters/month free (≈35–120 campaigns), then billed per character — set a quota cap | Free F0 tier ≈ 2M characters/month; stops at the limit, no charge | ≈ US$0.05–0.15 per campaign |
+| Style | Faithful machine translation | Faithful machine translation | Rewritten for shoppers; drops Japan-only logistics |
+| SEO title/description, alt text | Derived from the translated title and short description | Same | Written by the model |
+| Structure | Sent as HTML; headings, bold and bullets preserved | Same | Preserved by instruction |
+| Brand / model names | Marked `translate="no"` / `notranslate` | Marked `notranslate` | Kept by instruction |
+
+Characters are counted once per target language (English + Chinese ≈ 2× the
+Japanese text). Quota/rate-limit errors are retried; when a free allowance is
+used up, re-queue with **Re-translate** after the monthly reset. Switching provider
+only changes new translations; existing versions record which provider made them.
 
 ## Switching to an official API later
 

@@ -10,6 +10,8 @@ import { HtmlCampaignSource } from '@/lib/greenfunding/sources/html'
 import { RequestBudgetExceeded, SourceError } from '@/lib/greenfunding/types'
 import { campaignIdFromUrl, validateCampaignUrl } from '@/lib/greenfunding/url'
 import { AnthropicTranslator } from '@/lib/translation/anthropic'
+import { AzureTranslator, latinTerms, textToHtml } from '@/lib/translation/azure'
+import { GoogleTranslator } from '@/lib/translation/google'
 import { TranslationError } from '@/lib/translation/types'
 import { campaignHtml, listingHtml } from '../fixtures/greenfunding'
 
@@ -387,5 +389,126 @@ describe('translation retries', () => {
   })
   it('does not retry permanent errors', () => {
     expect(nextAttempt(1, 3, false, now).status).toBe('failed')
+  })
+})
+
+// Azure Translator (free-tier alternative)
+describe('AI translation (Azure Translator)', () => {
+  const source = {
+    title: 'Skullcandy Crusher 1080 ANC ヘッドホン',
+    shortDescription: '最大40時間再生。',
+    description: '### 特徴\n\n**Skullcandy**の最新モデル。\n\n• 重量：250g\n• 型番：X100',
+    brand: 'Skullcandy Japan',
+  }
+  // Echo the request, standing in for the translation, so we can inspect what was sent.
+  const echo = vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+    const items = JSON.parse(String(init!.body)) as { Text: string }[]
+    return new Response(JSON.stringify(items.map((i) => ({ translations: [{ text: i.Text.replace('ヘッドホン', 'Headphones').replace('特徴', 'Features').replace('最大40時間再生。', 'Up to 40 hours of playback.'), to: 'en' }] }))), { status: 200 })
+  })
+
+  it('calls Translator v3 with the right languages, key, region and HTML mode', async () => {
+    const t = new AzureTranslator('az-key', 'eastasia', 'https://api.cognitive.microsofttranslator.com', 1000, echo as unknown as typeof fetch)
+    await t.translate(source, 'zh-HK')
+    const [url, init] = echo.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.cognitive.microsofttranslator.com/translate?api-version=3.0&from=ja&to=zh-Hant&textType=html')
+    expect(init.headers).toMatchObject({ 'Ocp-Apim-Subscription-Key': 'az-key', 'Ocp-Apim-Subscription-Region': 'eastasia' })
+  })
+
+  it('protects brand and model names and keeps headings, bold and bullets', async () => {
+    echo.mockClear()
+    const t = new AzureTranslator('k', null, undefined, 1000, echo as unknown as typeof fetch)
+    const out = await t.translate(source, 'en')
+    const sent = JSON.parse(String((echo.mock.calls[0] as unknown as [string, RequestInit])[1].body)) as { Text: string }[]
+    expect(sent[0].Text).toContain('<span class="notranslate" translate="no">Skullcandy Crusher 1080 ANC</span>')
+    expect(sent[2].Text).toContain('<h3>特徴</h3>')
+    expect(sent[2].Text).toContain('<li>重量：250g</li>')
+    expect(out.title).toBe('Skullcandy Crusher 1080 ANC Headphones')
+    expect(out.description).toBe('### Features\n\n**Skullcandy**の最新モデル。\n\n• 重量：250g\n• 型番：X100')
+    expect(out.seoTitle.length).toBeLessThanOrEqual(70)
+    expect(out.seoDescription).toBe('Up to 40 hours of playback.')
+  })
+
+  it('treats a used-up free quota as "try later" and a bad key as permanent', async () => {
+    const make = (status: number, code: number) =>
+      new AzureTranslator('k', null, undefined, 1000, (async () => new Response(JSON.stringify({ error: { code, message: 'x' } }), { status })) as unknown as typeof fetch)
+    const quota = await make(403, 403001).translate(source, 'en').catch((e) => e)
+    expect(quota.retryable).toBe(true)
+    const badKey = await make(401, 401000).translate(source, 'en').catch((e) => e)
+    expect(badKey.retryable).toBe(false)
+  })
+
+  it('round-trips the description format', () => {
+    expect(textToHtml('### A\n\n**b** c\n\n• x\n• y')).toBe('<h3>A</h3>\n<p><strong>b</strong> c</p>\n<ul><li>x</li><li>y</li></ul>')
+    expect(latinTerms('テスト Crusher 1080 ANC と X100')).toEqual(['Crusher 1080 ANC', 'X100'])
+  })
+
+  it('is selected with TRANSLATION_PROVIDER=azure', async () => {
+    vi.stubEnv('TRANSLATION_PROVIDER', 'azure')
+    vi.stubEnv('TRANSLATION_API_KEY', 'k')
+    vi.stubEnv('AZURE_TRANSLATOR_REGION', 'eastasia')
+    const { createTranslator, translationConfig } = await import('@/lib/translation')
+    expect(createTranslator()?.name).toBe('azure')
+    expect(translationConfig().model).toBe('translator-v3')
+    vi.unstubAllEnvs()
+  })
+})
+
+// Google Cloud Translation (Basic v2)
+describe('translation (Google Cloud Translation)', () => {
+  const source = {
+    title: 'Skullcandy Crusher 1080 ANC ヘッドホン',
+    shortDescription: '最大40時間再生。',
+    description: '### 特徴\n\n**Skullcandy**の最新モデル。\n\n• 重量：250g\n• 型番：X100',
+    brand: 'Skullcandy Japan',
+  }
+  const echo = () =>
+    vi.fn(async (_url: string | URL | Request, init?: RequestInit) => {
+      const body = JSON.parse(String(init!.body)) as { q: string[] }
+      return new Response(JSON.stringify({ data: { translations: body.q.map((t) => ({ translatedText: t.replace('ヘッドホン', '耳機').replace('特徴', '特點').replace('最大40時間再生。', '最長 40 小時播放。') })) } }), { status: 200 })
+    })
+
+  it('sends Japanese → Traditional Chinese (zh-TW) as HTML with the key in a header', async () => {
+    const f = echo()
+    const out = await new GoogleTranslator('g-key', undefined, 1000, f as unknown as typeof fetch).translate(source, 'zh-HK')
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://translation.googleapis.com/language/translate/v2')
+    expect(url).not.toContain('g-key')
+    expect(init.headers).toMatchObject({ 'X-Goog-Api-Key': 'g-key' })
+    const body = JSON.parse(String(init.body))
+    expect(body).toMatchObject({ source: 'ja', target: 'zh-TW', format: 'html' })
+    expect(body.q[0]).toContain('<span class="notranslate" translate="no">Skullcandy Crusher 1080 ANC</span>')
+    expect(out.title).toBe('Skullcandy Crusher 1080 ANC 耳機')
+    expect(out.description).toBe('### 特點\n\n**Skullcandy**の最新モデル。\n\n• 重量：250g\n• 型番：X100')
+    expect(out.seoDescription).toBe('最長 40 小時播放。')
+  })
+
+  it('splits long descriptions into requests of at most ~5,000 characters, keeping order', async () => {
+    const f = echo()
+    const long = Array.from({ length: 12 }, (_, i) => `段落${i}：${'あ'.repeat(900)}`).join('\n\n')
+    const out = await new GoogleTranslator('k', undefined, 1000, f as unknown as typeof fetch).translate({ ...source, description: long }, 'en')
+    expect(f.mock.calls.length).toBeGreaterThan(2)
+    for (const [, init] of f.mock.calls as unknown as [string, RequestInit][]) {
+      const q = (JSON.parse(String(init.body)) as { q: string[] }).q
+      expect(q.join('').length).toBeLessThanOrEqual(5000)
+    }
+    expect(out.description!.indexOf('段落0')).toBeLessThan(out.description!.indexOf('段落11'))
+  })
+
+  it('retries rate limits but not a bad key or disabled API', async () => {
+    const make = (status: number, reason: string) =>
+      new GoogleTranslator('k', undefined, 1000, (async () => new Response(JSON.stringify({ error: { code: status, message: 'x', errors: [{ reason }] } }), { status })) as unknown as typeof fetch)
+    expect((await make(403, 'userRateLimitExceeded').translate(source, 'en').catch((e) => e)).retryable).toBe(true)
+    expect((await make(429, 'rateLimitExceeded').translate(source, 'en').catch((e) => e)).retryable).toBe(true)
+    expect((await make(400, 'badRequest').translate(source, 'en').catch((e) => e)).retryable).toBe(false)
+    expect((await make(403, 'accessNotConfigured').translate(source, 'en').catch((e) => e)).retryable).toBe(false)
+  })
+
+  it('is selected with TRANSLATION_PROVIDER=google', async () => {
+    vi.stubEnv('TRANSLATION_PROVIDER', 'google')
+    vi.stubEnv('TRANSLATION_API_KEY', 'k')
+    const { createTranslator, translationConfig } = await import('@/lib/translation')
+    expect(createTranslator()?.name).toBe('google')
+    expect(translationConfig().model).toBe('translate-v2')
+    vi.unstubAllEnvs()
   })
 })
