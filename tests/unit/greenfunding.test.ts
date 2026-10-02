@@ -137,6 +137,16 @@ describe('image import', () => {
     expect(res.imported).toHaveLength(1)
     expect(res.errors[0]).toMatch(/fake: Not a supported image type/)
   })
+  it('names an image "hero" only when the product has no images yet', async () => {
+    const { deps: d, uploads } = deps()
+    await importImages('1001', ['https://images.greenfunding.jp/store/new1', 'https://images.greenfunding.jp/store/new2'], d, 4)
+    expect(uploads.every((u) => !u.includes('hero'))).toBe(true)
+  })
+  it('reports unusable images so they are not retried', async () => {
+    const { deps: d } = deps()
+    const res = await importImages('1001', ['https://images.greenfunding.jp/store/bad'], d)
+    expect(res.unusable).toEqual(['https://images.greenfunding.jp/store/bad'])
+  })
   it('uses stable file names and reads image dimensions', () => {
     expect(imagePath('1', 'https://x/a', 3, 'jpg')).toBe(imagePath('1', 'https://x/a', 3, 'jpg'))
     expect(imageSize(png)).toEqual({ width: 1200, height: 900 })

@@ -112,10 +112,14 @@ function imageAllowed(u: string, config: GreenFundingConfig) {
 
 async function importCampaignImages(db: Db, config: GreenFundingConfig, productId: string, campaign: SourceCampaign) {
   const allowed = campaign.imageUrls.filter((u) => imageAllowed(u, config))
-  const { data: rows } = await db.from('product_images').select('original_url, position').eq('product_id', productId)
+  const [{ data: rows }, { data: meta }] = await Promise.all([
+    db.from('product_images').select('original_url, position').eq('product_id', productId),
+    db.from('product_source_metadata').select('id, skipped_image_urls').eq('product_id', productId).maybeSingle(),
+  ])
   const existing = new Set((rows ?? []).map((r) => r.original_url).filter((u): u is string => Boolean(u)))
+  const skipped = new Set(meta?.skipped_image_urls ?? [])
   const room = Math.max(config.maxImagesPerProduct - (rows?.length ?? 0), 0)
-  const wanted = allowed.filter((u) => !existing.has(u)).slice(0, room)
+  const wanted = allowed.filter((u) => !existing.has(u) && !skipped.has(u)).slice(0, room)
   if (!wanted.length) return { imported: 0, errors: [] as string[] }
   const storage = storageFor(db)
   const start = Math.max(-1, ...(rows ?? []).map((r) => r.position)) + 1
@@ -125,6 +129,10 @@ async function importCampaignImages(db: Db, config: GreenFundingConfig, productI
     { fetch, ...storage, existing, delayMs: config.requestDelayMs, timeoutMs: config.timeoutMs, userAgent: config.userAgent },
     start,
   )
+  // Unusable images (too large, not an image) are remembered and never retried.
+  if (result.unusable.length && meta) {
+    await db.from('product_source_metadata').update({ skipped_image_urls: [...skipped, ...result.unusable] }).eq('id', meta.id)
+  }
   if (result.imported.length) {
     const { error } = await db.from('product_images').insert(
       result.imported.map((img) => ({
@@ -265,6 +273,8 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
   const started = Date.now()
   const productId = row.product_id!
   const { data: images } = await db.from('product_images').select('original_url').eq('product_id', productId)
+  const { data: skippedRow } = await db.from('product_source_metadata').select('skipped_image_urls').eq('id', row.id).maybeSingle()
+  const skippedImages = new Set(skippedRow?.skipped_image_urls ?? [])
   const changed = changedFields(
     {
       ja_title: row.ja_title,
@@ -275,7 +285,7 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
       source_categories: row.source_categories,
       image_urls: (images ?? []).map((i) => i.original_url).filter((u): u is string => Boolean(u)),
     },
-    { ...campaign, imageUrls: campaign.imageUrls.filter((u) => imageAllowed(u, config)) },
+    { ...campaign, imageUrls: campaign.imageUrls.filter((u) => imageAllowed(u, config) && !skippedImages.has(u)) },
     config.maxImagesPerProduct,
   )
   // Funding figures change constantly; they are refreshed without flagging an update.
@@ -298,7 +308,8 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
   // An administrator-edited summary is kept; otherwise it follows the source.
   const source = translationSource(campaign, config.summaryChars, row.ja_summary_edited ? row.ja_summary : null)
   const hash = sourceContentHash(source)
-  const significant = changed.filter((f) => f !== 'end_date')
+  // New images are imported automatically and end dates are estimates: neither needs review.
+  const significant = changed.filter((f) => f !== 'end_date' && f !== 'images')
   await db
     .from('product_source_metadata')
     .update({
@@ -310,8 +321,8 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
       source_status: campaign.status,
       source_categories: campaign.categories,
       source_content_hash: hash,
-      changed_fields: [...new Set([...(row.changed_fields ?? []), ...changed])],
-      update_available: significant.length > 0,
+      changed_fields: [...new Set([...(row.changed_fields ?? []), ...significant])],
+      ...(significant.length ? { update_available: true } : {}),
       source_last_updated_at: new Date().toISOString(),
     })
     .eq('id', row.id)

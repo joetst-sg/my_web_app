@@ -22,10 +22,14 @@ export type ImageDeps = {
 
 export type ImportedImage = { originalUrl: string; storagePath: string; publicUrl: string; width: number | null; height: number | null; position: number }
 
-// Storage path for an image: hero.<ext> for the first, otherwise a short hash
-// of the original URL (stable, so the same image always maps to the same file).
-export function imagePath(campaignId: string, originalUrl: string, index: number, ext: string) {
-  const name = index === 0 ? 'hero' : `image-${createHash('sha1').update(originalUrl).digest('hex').slice(0, 12)}`
+// Errors that will never succeed on retry (the image itself is unusable).
+export class PermanentImageError extends Error {}
+
+// Storage path for an image: hero.<ext> for a product's very first image,
+// otherwise a short hash of the original URL (stable, so the same image always
+// maps to the same file and never collides with an existing one).
+export function imagePath(campaignId: string, originalUrl: string, index: number, ext: string, isFirstImage = index === 0) {
+  const name = isFirstImage ? 'hero' : `image-${createHash('sha1').update(originalUrl).digest('hex').slice(0, 12)}`
   return `campaign-${campaignId}/${name}.${ext}`
 }
 
@@ -76,9 +80,10 @@ export async function importImages(
   urls: string[],
   deps: ImageDeps,
   startPosition = 0,
-): Promise<{ imported: ImportedImage[]; skipped: number; errors: string[] }> {
+): Promise<{ imported: ImportedImage[]; skipped: number; errors: string[]; unusable: string[] }> {
   const imported: ImportedImage[] = []
   const errors: string[] = []
+  const unusable: string[] = []
   let skipped = 0
   let position = startPosition
   for (const [index, originalUrl] of urls.entries()) {
@@ -92,22 +97,23 @@ export async function importImages(
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const declared = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
       const declaredLength = Number(res.headers.get('content-length'))
-      if (declaredLength > MAX_BYTES) throw new Error(`Image is larger than ${MAX_BYTES / 1024 / 1024} MB`)
+      if (declaredLength > MAX_BYTES) throw new PermanentImageError(`Image is larger than ${MAX_BYTES / 1024 / 1024} MB`)
       const bytes = new Uint8Array(await res.arrayBuffer())
-      if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) throw new Error(`Image size ${bytes.byteLength} bytes is outside the allowed range`)
+      if (bytes.byteLength === 0 || bytes.byteLength > MAX_BYTES) throw new PermanentImageError(`Image size ${bytes.byteLength} bytes is outside the allowed range`)
       const type = sniffImageType(bytes)
       if (!type || (declared && declared !== 'application/octet-stream' && declared !== 'binary/octet-stream' && declared !== type)) {
-        throw new Error(`Not a supported image type (${declared || type || 'unknown'})`)
+        throw new PermanentImageError(`Not a supported image type (${declared || type || 'unknown'})`)
       }
       const ext = TYPES[type]
-      const path = imagePath(campaignId, originalUrl, index, ext)
+      const path = imagePath(campaignId, originalUrl, index, ext, startPosition === 0 && index === 0)
       await deps.upload(path, bytes, type)
       const size = imageSize(bytes)
       imported.push({ originalUrl, storagePath: path, publicUrl: deps.publicUrl(path), width: size?.width ?? null, height: size?.height ?? null, position: position++ })
       deps.existing.add(originalUrl)
     } catch (e) {
       errors.push(`${originalUrl}: ${e instanceof Error ? e.message : String(e)}`)
+      if (e instanceof PermanentImageError) unusable.push(originalUrl)
     }
   }
-  return { imported, skipped, errors }
+  return { imported, skipped, errors, unusable }
 }

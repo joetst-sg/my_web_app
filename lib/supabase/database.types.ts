@@ -1205,6 +1205,7 @@ export type Database = {
           raw_metadata: Json
           reviewed_at: string | null
           reviewed_by: string | null
+          skipped_image_urls: string[]
           source: string
           source_campaign_id: string
           source_categories: string[]
@@ -1245,6 +1246,7 @@ export type Database = {
           raw_metadata?: Json
           reviewed_at?: string | null
           reviewed_by?: string | null
+          skipped_image_urls?: string[]
           source?: string
           source_campaign_id: string
           source_categories?: string[]
@@ -1285,6 +1287,7 @@ export type Database = {
           raw_metadata?: Json
           reviewed_at?: string | null
           reviewed_by?: string | null
+          skipped_image_urls?: string[]
           source?: string
           source_campaign_id?: string
           source_categories?: string[]
