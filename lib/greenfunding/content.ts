@@ -31,7 +31,9 @@ export type StoredSource = {
   image_urls: string[]
 }
 
-export function changedFields(stored: StoredSource, fresh: SourceCampaign): string[] {
+// maxImages: only the images that would actually be imported are compared
+// (pages often have far more images than the import limit).
+export function changedFields(stored: StoredSource, fresh: SourceCampaign, maxImages = Infinity): string[] {
   const changed: string[] = []
   if ((stored.ja_title ?? null) !== fresh.title) changed.push('title')
   if ((stored.ja_short_description ?? null) !== fresh.shortDescription) changed.push('short_description')
@@ -43,7 +45,8 @@ export function changedFields(stored: StoredSource, fresh: SourceCampaign): stri
   if ((a === null) !== (b === null) || (a !== null && b !== null && Math.abs(a - b) > 36 * 3_600_000)) changed.push('end_date')
   if ([...stored.source_categories].sort().join('|') !== [...fresh.categories].sort().join('|')) changed.push('categories')
   const storedImages = new Set(stored.image_urls)
-  if (fresh.imageUrls.some((u) => !storedImages.has(u))) changed.push('images')
+  const room = Math.max(maxImages - storedImages.size, 0)
+  if (room > 0 && fresh.imageUrls.slice(0, maxImages).some((u) => !storedImages.has(u))) changed.push('images')
   return changed
 }
 

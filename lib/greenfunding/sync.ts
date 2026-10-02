@@ -101,15 +101,17 @@ function storageFor(db: Db) {
   }
 }
 
+function imageAllowed(u: string, config: GreenFundingConfig) {
+  try {
+    const url = new URL(u)
+    return url.protocol === 'https:' && hostAllowed(url.hostname, config.imageDomains)
+  } catch {
+    return false
+  }
+}
+
 async function importCampaignImages(db: Db, config: GreenFundingConfig, productId: string, campaign: SourceCampaign) {
-  const allowed = campaign.imageUrls.filter((u) => {
-    try {
-      const url = new URL(u)
-      return url.protocol === 'https:' && hostAllowed(url.hostname, config.imageDomains)
-    } catch {
-      return false
-    }
-  })
+  const allowed = campaign.imageUrls.filter((u) => imageAllowed(u, config))
   const { data: rows } = await db.from('product_images').select('original_url, position').eq('product_id', productId)
   const existing = new Set((rows ?? []).map((r) => r.original_url).filter((u): u is string => Boolean(u)))
   const room = Math.max(config.maxImagesPerProduct - (rows?.length ?? 0), 0)
@@ -273,7 +275,8 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
       source_categories: row.source_categories,
       image_urls: (images ?? []).map((i) => i.original_url).filter((u): u is string => Boolean(u)),
     },
-    campaign,
+    { ...campaign, imageUrls: campaign.imageUrls.filter((u) => imageAllowed(u, config)) },
+    config.maxImagesPerProduct,
   )
   // Funding figures change constantly; they are refreshed without flagging an update.
   const figures = {

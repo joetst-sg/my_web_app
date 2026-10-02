@@ -259,6 +259,11 @@ describe('update detection', () => {
     const later = parseCampaignPage(campaignHtml({ daysLeft: '30', ribbon: 'SUCCESS !', extra: '<p>新色追加</p><p><img src="https://images.greenfunding.jp/store/new"></p>' }), ref, BASE, NOW)
     expect(changedFields(stored, later)).toEqual(['description', 'status', 'end_date', 'images'])
   })
+  it('ignores images beyond the import limit once the product is full', () => {
+    const many = { ...fresh, imageUrls: [...fresh.imageUrls, 'https://images.greenfunding.jp/store/extra1', 'https://images.greenfunding.jp/store/extra2'] }
+    expect(changedFields(stored, many, 2)).toEqual([])
+    expect(changedFields({ ...stored, image_urls: fresh.imageUrls.slice(0, 1) }, many, 2)).toEqual(['images'])
+  })
   it('re-checks only live imported campaigns', () => {
     expect(shouldCheckForUpdates({ product_id: 'p', pipeline_status: 'published', source_status: 'active' })).toBe(true)
     expect(shouldCheckForUpdates({ product_id: 'p', pipeline_status: 'published', source_status: 'ended' })).toBe(false)
