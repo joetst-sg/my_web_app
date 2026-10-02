@@ -52,6 +52,26 @@ export function protect(html: string, terms: string[]) {
   return out.replace(/\u0000(\d+)\u0000/g, (_, i: string) => `<span class="notranslate" translate="no">${escape(sorted[Number(i)])}</span>`)
 }
 
+// Removes spacing artefacts machine translation leaves around names and
+// punctuation ("LG 's", "“ Trinity ”", "AI -powered", "Styler ™").
+export function tidySpacing(text: string) {
+  return text
+    .split('\n')
+    .map((line) =>
+      line
+        .replace(/[ \t]+([,.!?;:%)\]}」』”’、。，．！？：；）】])/g, '$1')
+        .replace(/([(\[{「『“‘（【])[ \t]+/g, '$1')
+        // A straight quote at the start of a phrase opens it: '" Vocci' → '"Vocci'.
+        .replace(/(^|[\s(\[])"[ \t]+(?=\S)/g, '$1"')
+        .replace(/(\w)[ \t]+'s\b/g, "$1's")
+        .replace(/(\w)[ \t]+-(?=\w)/g, '$1-')
+        .replace(/[ \t]+([™®©])/g, '$1')
+        .replace(/[ \t]{2,}/g, ' ')
+        .trim(),
+    )
+    .join('\n')
+}
+
 // Groups HTML blocks into chunks no longer than `max` characters (a single
 // oversized block is kept whole rather than cut mid-sentence).
 export function chunk(blocks: string[], max: number) {
@@ -75,13 +95,14 @@ export async function translateWithMachine(
   target: TargetLanguage,
   translateHtml: (html: string[], target: TargetLanguage) => Promise<string[]>,
   maxChunk = 4500,
+  protectNames = true,
 ): Promise<TranslationOutput> {
-  const keep = [...(input.brand ? [input.brand] : []), ...latinTerms(input.title)]
+  const keep = protectNames ? [...(input.brand ? [input.brand] : []), ...latinTerms(input.title)] : []
   const descriptionChunks = chunk(textToHtmlBlocks((input.description ?? '').slice(0, LIMITS.description)), maxChunk).map((c) => protect(c, keep))
   const parts = [protect(escape(input.title), keep), protect(escape(input.shortDescription ?? ''), keep), ...descriptionChunks]
   const out = await translateHtml(parts, target)
   if (out.length !== parts.length) throw new TranslationError('The translation service returned an unexpected response.')
-  const plain = (html: string) => htmlToText(html).text ?? ''
+  const plain = (html: string) => tidySpacing(htmlToText(html).text ?? '')
   const title = plain(out[0]).replace(/\s*\n\s*/g, ' ')
   if (!title) throw new TranslationError('Translation is missing a title.')
   const short = plain(out[1]).replace(/\s*\n\s*/g, ' ') || null

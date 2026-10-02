@@ -5,10 +5,11 @@ import { z } from 'zod'
 import { getViewer } from '@/lib/auth'
 import type { ActionResult } from '@/lib/errors'
 import { greenFundingConfig } from '@/lib/greenfunding/config'
-import { runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
+import { backfillSummaries, runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
+import { sourceContentHash, translationSource } from '@/lib/greenfunding/content'
 import { campaignIdFromUrl, validateCampaignUrl } from '@/lib/greenfunding/url'
 import { createServiceClient } from '@/lib/supabase/server'
-import { processTranslationQueue, type QueueResult } from '@/lib/translation/queue'
+import { processTranslationQueue, translateProductNow, type QueueResult } from '@/lib/translation/queue'
 
 // Every action here is for administrators only. The checks run on the server;
 // privileged writes then use the service role.
@@ -44,6 +45,7 @@ export async function syncNow(): Promise<ActionResult<SyncResult>> {
 export async function translateNow(): Promise<ActionResult<QueueResult>> {
   const a = await admin()
   if (!a.ok) return a
+  await backfillSummaries(a.db)
   const result = await processTranslationQueue(1)
   refresh()
   if (result.note) return { ok: false, error: result.note }
@@ -266,4 +268,38 @@ export async function saveCategoryMapping(sourceCategory: string, categoryId: st
   if (error) return { ok: false, error: error.message }
   refresh()
   return { ok: true, message: 'Mapping saved. It applies to future imports.' }
+}
+
+// Saves an administrator-edited Japanese summary (what gets translated) and
+// translates it straight away into English and Traditional Chinese.
+export async function saveSummaryAndTranslate(productId: string, summary: string): Promise<ActionResult> {
+  const a = await admin()
+  if (!a.ok) return a
+  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const text = z.string().trim().min(10, 'Write at least a sentence.').max(3000, 'Keep the summary under 3,000 characters.').safeParse(summary)
+  if (!text.success) return { ok: false, error: text.error.issues[0]?.message ?? 'Invalid summary.' }
+  const { db, viewer } = a
+  const { meta, product } = await loadImport(db, productId)
+  if (!meta || !product) return { ok: false, error: 'This is not an imported GREEN FUNDING product.' }
+  const config = greenFundingConfig()
+  const hash = sourceContentHash(translationSource({ title: meta.ja_title, shortDescription: meta.ja_short_description, description: meta.ja_description }, config.summaryChars, text.data))
+  await db.from('product_source_metadata').update({ ja_summary: text.data, ja_summary_edited: true, source_content_hash: hash }).eq('id', meta.id)
+  await logSync(db, { operation: 'edit', status: 'success', campaignId: meta.source_campaign_id, campaignUrl: meta.source_url, productId, message: `Japanese summary edited by ${viewer.email}` })
+  const res = await translateProductNow(productId)
+  refresh(product.slug)
+  if (!res.ok) return { ok: false, error: `Summary saved, but translation failed: ${res.error}` }
+  return { ok: true, message: 'Summary saved and translated into English and Traditional Chinese.' }
+}
+
+// Re-builds the automatic Japanese summary from the campaign page (undoing edits).
+export async function resetSummary(productId: string): Promise<ActionResult> {
+  const a = await admin()
+  if (!a.ok) return a
+  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { meta } = await loadImport(a.db, productId)
+  if (!meta) return { ok: false, error: 'Unknown import.' }
+  const source = translationSource({ title: meta.ja_title, shortDescription: meta.ja_short_description, description: meta.ja_description }, greenFundingConfig().summaryChars)
+  await a.db.from('product_source_metadata').update({ ja_summary: source.summary ?? '', ja_summary_edited: false, source_content_hash: sourceContentHash(source) }).eq('id', meta.id)
+  refresh()
+  return { ok: true, message: 'Automatic summary restored. Click “Save & translate” to translate it.' }
 }

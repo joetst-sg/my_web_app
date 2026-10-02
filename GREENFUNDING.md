@@ -35,11 +35,25 @@ Visitor ──► Buy now ──► /go/product/<id> ──► 302 to the stored
 | Admin | `/admin/greenfunding`, `/admin/greenfunding/<product id>`, `/admin/greenfunding/logs` |
 | Database | migrations `20261004000014_greenfunding.sql`, `20261004000015_campaign_info.sql` |
 
+### What gets translated
+
+Not the full campaign page. Each import gets an automatic **Japanese summary**
+(`lib/greenfunding/summary.ts`, about `GREEN_FUNDING_SUMMARY_CHARS` = 400
+characters): the introduction plus a "主な特徴" (key features) list built from
+section headings and spec lines. Support plans/rewards, prices, crowdfunding
+figures, shipping/payment details, FAQs, schedules and video/SNS filler are
+left out. Only the title, the cleaned short description and this summary are
+sent for translation (~1,200–1,400 characters per campaign for both languages,
+instead of ~14,000 for the whole page). The full Japanese text is kept for
+reference. In the review screen you can edit the summary and click
+**Save & translate**; an edited summary is never overwritten by a re-sync.
+
 ### Where each language lives
 
 | Language | Stored in | Notes |
 | --- | --- | --- |
 | Japanese (source) | `product_source_metadata.ja_*` | Never overwritten by translations; read-only in the review screen |
+| Japanese summary | `product_source_metadata.ja_summary` | What is translated; editable in the review screen |
 | English | `products.name/tagline/description/seo_*` | What `/products/<slug>` shows |
 | Traditional Chinese | `products.translations->'zh-HK'` | What `/zh/products/<slug>` shows |
 | Every version | `product_translation_versions` | AI or admin, with provider, model, version, timestamp |

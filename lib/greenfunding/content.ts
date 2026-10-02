@@ -1,10 +1,23 @@
 import { createHash } from 'node:crypto'
+import { buildJapaneseSummary, cleanShortDescription } from './summary'
 import type { SourceCampaign } from './types'
 
-// Hash of the source text that translations are made from. If it hasn't
-// changed, nothing is sent to the AI again.
-export function sourceContentHash(c: Pick<SourceCampaign, 'title' | 'shortDescription' | 'description'>) {
-  return createHash('sha256').update(JSON.stringify([c.title ?? '', c.shortDescription ?? '', c.description ?? ''])).digest('hex')
+// What is sent for translation: the title, the short description and a short
+// Japanese summary (never the full page, support plans or prices).
+export type TranslationSource = { title: string | null; shortDescription: string | null; summary: string | null }
+
+export function translationSource(c: { title: string | null; shortDescription: string | null; description: string | null }, summaryChars: number, editedSummary?: string | null): TranslationSource {
+  return {
+    title: c.title,
+    shortDescription: cleanShortDescription(c.shortDescription),
+    summary: editedSummary ?? buildJapaneseSummary(c.description, summaryChars),
+  }
+}
+
+// Hash of exactly what is translated. If it hasn't changed, nothing is sent
+// to the translation service again.
+export function sourceContentHash(s: TranslationSource) {
+  return createHash('sha256').update(JSON.stringify(['v2', s.title ?? '', s.shortDescription ?? '', s.summary ?? ''])).digest('hex')
 }
 
 // Fields that differ between the stored source data and a fresh fetch.

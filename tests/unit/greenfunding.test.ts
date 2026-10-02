@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { greenFundingConfig } from '@/lib/greenfunding/config'
-import { changedFields, eligibility, needsTranslationReview, sourceContentHash } from '@/lib/greenfunding/content'
+import { changedFields, eligibility, needsTranslationReview, sourceContentHash, translationSource } from '@/lib/greenfunding/content'
 import { actionForListedCampaign, applyTranslationAutomatically, nextAttempt, pipelineAfterTranslation, shouldCheckForUpdates, syncIsDue } from '@/lib/greenfunding/decide'
 import { imagePath, imageSize, importImages } from '@/lib/greenfunding/images'
 import { normalizeTag, resolveCategory } from '@/lib/greenfunding/mapping'
@@ -9,6 +9,8 @@ import { htmlToText, parseCampaignList, parseCampaignPage } from '@/lib/greenfun
 import { HtmlCampaignSource } from '@/lib/greenfunding/sources/html'
 import { RequestBudgetExceeded, SourceError } from '@/lib/greenfunding/types'
 import { campaignIdFromUrl, validateCampaignUrl } from '@/lib/greenfunding/url'
+import { buildJapaneseSummary, cleanShortDescription } from '@/lib/greenfunding/summary'
+import { tidySpacing } from '@/lib/translation/machine'
 import { AnthropicTranslator } from '@/lib/translation/anthropic'
 import { AzureTranslator, latinTerms, textToHtml } from '@/lib/translation/azure'
 import { GoogleTranslator } from '@/lib/translation/google'
@@ -267,10 +269,13 @@ describe('update detection', () => {
 
 // 10. Translation update detection and cost control
 describe('translation updates', () => {
-  const base = { title: 'a', shortDescription: 'b', description: 'c' }
-  it('only re-translates when the source text changes', () => {
+  const base = { title: 'a', shortDescription: 'b', summary: 'c' }
+  it('only re-translates when the translated text changes', () => {
     expect(sourceContentHash(base)).toBe(sourceContentHash({ ...base }))
-    expect(sourceContentHash(base)).not.toBe(sourceContentHash({ ...base, description: 'c2' }))
+    expect(sourceContentHash(base)).not.toBe(sourceContentHash({ ...base, summary: 'c2' }))
+    // A change elsewhere in the full description that doesn't affect the summary costs nothing.
+    const page = { title: 't', shortDescription: 's', description: '紹介文です。製品の説明です。\n\n### リターン\n\n早割 3,000円' }
+    expect(sourceContentHash(translationSource(page, 400))).toBe(sourceContentHash(translationSource({ ...page, description: page.description.replace('3,000円', '2,500円') }, 400)))
     expect(needsTranslationReview(['status', 'images', 'end_date'])).toBe(false)
     expect(needsTranslationReview(['description'])).toBe(true)
   })
@@ -476,7 +481,8 @@ describe('translation (Google Cloud Translation)', () => {
     expect(init.headers).toMatchObject({ 'X-Goog-Api-Key': 'g-key' })
     const body = JSON.parse(String(init.body))
     expect(body).toMatchObject({ source: 'ja', target: 'zh-TW', format: 'html' })
-    expect(body.q[0]).toContain('<span class="notranslate" translate="no">Skullcandy Crusher 1080 ANC</span>')
+    // Google keeps Latin names by itself; no extra markup (it caused repeated names).
+    expect(body.q[0]).not.toContain('notranslate')
     expect(out.title).toBe('Skullcandy Crusher 1080 ANC 耳機')
     expect(out.description).toBe('### 特點\n\n**Skullcandy**の最新モデル。\n\n• 重量：250g\n• 型番：X100')
     expect(out.seoDescription).toBe('最長 40 小時播放。')
@@ -492,6 +498,13 @@ describe('translation (Google Cloud Translation)', () => {
       expect(q.join('').length).toBeLessThanOrEqual(5000)
     }
     expect(out.description!.indexOf('段落0')).toBeLessThan(out.description!.indexOf('段落11'))
+  })
+
+  it('marks usage limits as quota (wait, no failed attempt)', async () => {
+    const t = new GoogleTranslator('k', undefined, 1000, (async () => new Response(JSON.stringify({ error: { code: 403, message: 'User Rate Limit Exceeded', errors: [{ reason: 'userRateLimitExceeded' }] } }), { status: 403 })) as unknown as typeof fetch)
+    const err = await t.translate(source, 'en').catch((e) => e)
+    expect(err.quota).toBe(true)
+    expect(err.retryable).toBe(true)
   })
 
   it('retries rate limits but not a bad key or disabled API', async () => {
@@ -510,5 +523,61 @@ describe('translation (Google Cloud Translation)', () => {
     expect(createTranslator()?.name).toBe('google')
     expect(translationConfig().model).toBe('translate-v2')
     vi.unstubAllEnvs()
+  })
+})
+
+
+// Japanese summary (what is translated)
+describe('Japanese summary', () => {
+  const page = [
+    '**毎日の衣類ケアを、もっとスマートに。**',
+    'GREEN FUNDINGで支援総額5,863万円を達成した前モデルが進化。',
+    'LG Styler™は、水の力で衣類を自宅でリフレッシュする衣類ケア家電です。新シリーズは衣類の量に合わせて運転を自動で調整します。',
+    '### ■YouTubeレビュー動画',
+    '人気YouTuberによるレビュー動画です！',
+    '### NEW! ｜AI乾燥',
+    '乾燥時間を自動調整します。',
+    '### 仕様',
+    '重量：約80kg\n消費電力：1,750W',
+    '### Q1. 保証はありますか？',
+    'A. 1年間の保証があります。',
+    '### 9月末 プロジェクト開始',
+    '### リターン',
+    '【超早割 20%OFF】一般販売予定価格 298,000円（税込）\nお届け予定：12月より順次発送',
+  ].join('\n\n')
+  const summary = buildJapaneseSummary(page, 400)!
+
+  it('keeps the introduction and key features', () => {
+    expect(summary).toContain('LG Styler™は、水の力で衣類を自宅でリフレッシュする衣類ケア家電です。')
+    expect(summary).toContain('### 主な特徴')
+    expect(summary).toContain('• AI乾燥')
+    expect(summary).toContain('• 重量：約80kg')
+  })
+  it('never includes support plans, prices, crowdfunding figures, shipping, FAQs, schedules or video filler', () => {
+    for (const banned of ['リターン', '円', '早割', 'OFF', '税込', '支援総額', 'GREEN FUNDING', 'お届け', '発送', 'Q1', '保証', 'プロジェクト開始', 'YouTube', '動画']) {
+      expect(summary, banned).not.toContain(banned)
+    }
+  })
+  it('respects the length limit', () => {
+    expect(summary.length).toBeLessThanOrEqual(420)
+    expect(buildJapaneseSummary(page, 120)!.length).toBeLessThanOrEqual(140)
+  })
+  it('cleans the short description', () => {
+    expect(cleanShortDescription('驚くほど静か。早割で3,000円！支援者募集中。')).toBe('驚くほど静か。')
+  })
+  it('is what gets translated, so translation usage stays small', () => {
+    const src = translationSource({ title: 'タイトル', shortDescription: '短い説明。', description: page }, 400)
+    expect(src.summary).toBe(summary)
+    expect((src.title ?? '').length + (src.shortDescription ?? '').length + (src.summary ?? '').length).toBeLessThan(page.length)
+    expect(translationSource({ title: 't', shortDescription: null, description: page }, 400, '編集した要約').summary).toBe('編集した要約')
+  })
+})
+
+describe('machine translation spacing clean-up', () => {
+  it('removes spaces machine translation adds around names and punctuation', () => {
+    expect(tidySpacing('" Vocci ," a ring')).toBe('"Vocci," a ring')
+    expect(tidySpacing("LG 's AI -powered Styler ™")).toBe("LG's AI-powered Styler™")
+    expect(tidySpacing('精緻的五合一保護套“ Trinity ”')).toBe('精緻的五合一保護套“Trinity”')
+    expect(tidySpacing('a - b')).toBe('a - b')
   })
 })

@@ -33,6 +33,8 @@ export function greenFundingConfig() {
     // Existing campaigns re-checked for updates per sync.
     updateChecksPerRun: int('GREEN_FUNDING_UPDATE_CHECKS_PER_RUN', 10, 0, 200),
     maxImagesPerProduct: int('GREEN_FUNDING_MAX_IMAGES', 10, 1, 30),
+    // Length (characters) of the Japanese summary that is translated instead of the full page.
+    summaryChars: int('GREEN_FUNDING_SUMMARY_CHARS', 400, 100, 3000),
     // GREEN FUNDING category names that are never imported (e.g. アイドル).
     excludedCategories: (process.env.GREEN_FUNDING_EXCLUDED_CATEGORIES ?? '').split(',').map((s) => s.trim()).filter(Boolean),
     userAgent: process.env.GREEN_FUNDING_USER_AGENT || 'JoetangtstBot/1.0 (+https://www.joetangtst.com; authorized GREEN FUNDING partner import)',

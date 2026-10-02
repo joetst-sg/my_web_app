@@ -32,8 +32,9 @@ export class AzureTranslator implements TranslationProvider {
       const body = (await res.json().catch(() => null)) as { error?: { code?: number; message?: string } } | null
       const code = body?.error?.code
       // 403001 = free-tier quota used up (resets monthly); 429xxx = too many requests.
-      const retryable = res.status === 429 || res.status >= 500 || code === 403001
-      throw new TranslationError(`Azure Translator ${res.status}${code ? ` (${code})` : ''}: ${body?.error?.message ?? 'request failed'}`, retryable)
+      const quota = res.status === 429 || code === 403001
+      const retryable = quota || res.status >= 500
+      throw new TranslationError(`Azure Translator ${res.status}${code ? ` (${code})` : ''}: ${body?.error?.message ?? 'request failed'}`, retryable, quota)
     }
     const data = (await res.json()) as { translations?: { text: string }[] }[]
     return data.map((d) => d.translations?.[0]?.text ?? '')

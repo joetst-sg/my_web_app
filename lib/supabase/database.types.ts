@@ -1191,6 +1191,8 @@ export type Database = {
           import_mode: string
           ja_description: string | null
           ja_short_description: string | null
+          ja_summary: string | null
+          ja_summary_edited: boolean
           ja_title: string | null
           last_error: string | null
           last_synced_at: string | null
@@ -1229,6 +1231,8 @@ export type Database = {
           import_mode?: string
           ja_description?: string | null
           ja_short_description?: string | null
+          ja_summary?: string | null
+          ja_summary_edited?: boolean
           ja_title?: string | null
           last_error?: string | null
           last_synced_at?: string | null
@@ -1267,6 +1271,8 @@ export type Database = {
           import_mode?: string
           ja_description?: string | null
           ja_short_description?: string | null
+          ja_summary?: string | null
+          ja_summary_edited?: boolean
           ja_title?: string | null
           last_error?: string | null
           last_synced_at?: string | null

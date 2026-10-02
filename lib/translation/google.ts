@@ -38,8 +38,9 @@ export class GoogleTranslator implements TranslationProvider {
       const body = (await res.json().catch(() => null)) as { error?: { code?: number; message?: string; errors?: { reason?: string }[] } } | null
       const reason = body?.error?.errors?.[0]?.reason ?? ''
       // Quota/rate limits clear by themselves; a bad key, disabled API or billing problem doesn't.
-      const retryable = res.status === 429 || res.status >= 500 || /rateLimitExceeded|userRateLimitExceeded|quotaExceeded|dailyLimitExceeded/.test(reason)
-      throw new TranslationError(`Google Cloud Translation ${res.status}${reason ? ` (${reason})` : ''}: ${body?.error?.message ?? 'request failed'}`, retryable)
+      const quota = res.status === 429 || /rateLimitExceeded|userRateLimitExceeded|quotaExceeded|dailyLimitExceeded|RESOURCE_EXHAUSTED/.test(reason + (body?.error?.message ?? ''))
+      const retryable = quota || res.status >= 500
+      throw new TranslationError(`Google Cloud Translation ${res.status}${reason ? ` (${reason})` : ''}: ${body?.error?.message ?? 'request failed'}`, retryable, quota)
     }
     const data = (await res.json()) as { data?: { translations?: { translatedText: string }[] } }
     const out = data.data?.translations?.map((t) => t.translatedText) ?? []
@@ -67,6 +68,8 @@ export class GoogleTranslator implements TranslationProvider {
   }
 
   translate(input: TranslationInput, target: TargetLanguage): Promise<TranslationOutput> {
-    return translateWithMachine(input, target, (html, t) => this.call(html, t), MAX_CHUNK)
+    // Google leaves Latin-script names alone by itself; extra no-translate
+    // markup made it repeat or garble names, so it isn't used here.
+    return translateWithMachine(input, target, (html, t) => this.call(html, t), MAX_CHUNK, false)
   }
 }

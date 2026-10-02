@@ -29,7 +29,9 @@ export interface TranslationProvider {
 }
 
 export class TranslationError extends Error {
-  constructor(message: string, readonly retryable = true) {
+  // quota: a usage limit (per day / per minute / free allowance) was reached.
+  // The job waits and tries again later without counting a failed attempt.
+  constructor(message: string, readonly retryable = true, readonly quota = false) {
     super(message)
   }
 }

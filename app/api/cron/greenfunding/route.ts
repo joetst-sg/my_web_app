@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
-import { runSync } from '@/lib/greenfunding/sync'
+import { backfillSummaries, runSync } from '@/lib/greenfunding/sync'
+import { createServiceClient } from '@/lib/supabase/server'
 import { processTranslationQueue } from '@/lib/translation/queue'
 
 export const dynamic = 'force-dynamic'
@@ -23,6 +24,8 @@ function authorized(request: NextRequest) {
 export async function GET(request: NextRequest) {
   if (!authorized(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const sync = await runSync('cron')
+  const db = createServiceClient()
+  const summaries = db ? await backfillSummaries(db) : null
   const translations = await processTranslationQueue()
-  return NextResponse.json({ sync, translations }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ sync, summaries, translations }, { headers: { 'Cache-Control': 'no-store' } })
 }

@@ -158,9 +158,9 @@ export default async function ReviewImportPage({ params }: PageProps<'/admin/gre
           <ActionButton action={retranslate.bind(null, product.id)} size="sm" variant="ghost" confirm={{ title: 'Generate a new AI translation?', description: 'Uses one AI request per language. Your current text stays until you apply the new version.', confirmLabel: 'Queue translation' }}>Re-translate</ActionButton>
         </div>
         <TranslationEditor
-          key={JSON.stringify([product.name, zh?.name, meta.source_content_hash])}
+          key={JSON.stringify([product.name, zh?.name, meta.source_content_hash, meta.ja_summary])}
           productId={product.id}
-          source={{ title: meta.ja_title, short_description: meta.ja_short_description, description: meta.ja_description }}
+          source={{ title: meta.ja_title, short_description: meta.ja_short_description, description: meta.ja_description, summary: meta.ja_summary, summaryEdited: meta.ja_summary_edited }}
           en={translated ? texts(product) : texts(null)}
           zh={texts(zh as never)}
         />

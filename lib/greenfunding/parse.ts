@@ -5,7 +5,11 @@
 import { campaignIdFromUrl, campaignUrlFromHref } from './url'
 import type { CampaignRef, SourceCampaign, SourceStatus } from './types'
 
-const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', reg: '®', trade: '™', copy: '©', hellip: '…', mdash: '—', ndash: '–', yen: '¥' }
+const ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', reg: '®', trade: '™', copy: '©', hellip: '…', mdash: '—', ndash: '–', yen: '¥',
+  ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’', laquo: '«', raquo: '»', deg: '°', times: '×', divide: '÷', middot: '·', bull: '•',
+  sup1: '¹', sup2: '²', sup3: '³', frac12: '½', frac14: '¼', frac34: '¾', plusmn: '±', micro: 'µ', ensp: ' ', emsp: ' ', thinsp: ' ',
+}
 
 export function decodeEntities(s: string) {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (m, e: string) => {

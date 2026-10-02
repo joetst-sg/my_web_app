@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { slugify } from '@/lib/format'
 import { createServiceClient } from '@/lib/supabase/server'
 import { greenFundingConfig, type GreenFundingConfig } from './config'
-import { changedFields, eligibility, needsTranslationReview, sourceContentHash } from './content'
+import { changedFields, eligibility, needsTranslationReview, sourceContentHash, translationSource } from './content'
 import { actionForListedCampaign, shouldCheckForUpdates, syncIsDue } from './decide'
 import { IMAGE_BUCKET, importImages } from './images'
 import { resolveCategory, type CategoryMapping } from './mapping'
@@ -26,6 +26,8 @@ type Registry = {
   source_categories: string[]
   changed_fields: string[]
   translated_content_hash: string | null
+  ja_summary: string | null
+  ja_summary_edited: boolean
 }
 
 export type SyncResult = {
@@ -43,7 +45,7 @@ export type SyncResult = {
 
 const SOURCE = 'greenfunding'
 const REGISTRY_COLUMNS =
-  'id, product_id, pipeline_status, source_status, source_campaign_id, source_url, ja_title, ja_short_description, ja_description, campaign_ends_at, source_categories, changed_fields, translated_content_hash'
+  'id, product_id, pipeline_status, source_status, source_campaign_id, source_url, ja_title, ja_short_description, ja_description, campaign_ends_at, source_categories, changed_fields, translated_content_hash, ja_summary, ja_summary_edited'
 
 export async function logSync(
   db: Db,
@@ -159,6 +161,7 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
     ja_title: campaign.title,
     ja_short_description: campaign.shortDescription,
     ja_description: campaign.description,
+    ja_summary: translationSource(campaign, config.summaryChars).summary,
     owner_name: campaign.ownerName,
     source_categories: campaign.categories,
     source_tags: campaign.tags,
@@ -196,7 +199,7 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
 
   let productId: string | null = null
   try {
-    const hash = sourceContentHash(campaign)
+    const hash = sourceContentHash(translationSource(campaign, config.summaryChars))
     const brandId = await findOrCreateBrand(db, campaign.ownerName)
     await rememberSourceCategories(db, campaign.categories)
     const categoryId = resolveCategory(campaign.categories, mappings)
@@ -289,7 +292,9 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
     return 'unchanged' as const
   }
 
-  const hash = sourceContentHash(campaign)
+  // An administrator-edited summary is kept; otherwise it follows the source.
+  const source = translationSource(campaign, config.summaryChars, row.ja_summary_edited ? row.ja_summary : null)
+  const hash = sourceContentHash(source)
   const significant = changed.filter((f) => f !== 'end_date')
   await db
     .from('product_source_metadata')
@@ -298,6 +303,7 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
       ja_title: campaign.title,
       ja_short_description: campaign.shortDescription,
       ja_description: campaign.description,
+      ja_summary: source.summary,
       source_status: campaign.status,
       source_categories: campaign.categories,
       source_content_hash: hash,
@@ -308,6 +314,7 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
     .eq('id', row.id)
 
   if (changed.includes('categories')) await rememberSourceCategories(db, campaign.categories)
+  // Only text that is actually translated (title, short description, summary) costs a new translation.
   if (needsTranslationReview(changed) && hash !== row.translated_content_hash) await queueTranslation(db, productId, hash)
   let imageNote = ''
   if (changed.includes('images')) {
@@ -326,6 +333,29 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
     durationMs: Date.now() - started,
   })
   return 'updated' as const
+}
+
+// Gives campaigns imported before summaries existed a summary, and queues a
+// translation when what would be translated has changed. No network calls.
+export async function backfillSummaries(db: Db, config: GreenFundingConfig = greenFundingConfig()) {
+  const { data: rows } = await db
+    .from('product_source_metadata')
+    .select('id, product_id, ja_title, ja_short_description, ja_description, ja_summary, ja_summary_edited, source_content_hash, translated_content_hash, pipeline_status')
+    .eq('source', SOURCE)
+    .not('product_id', 'is', null)
+    .is('ja_summary', null)
+    .limit(50)
+  let queued = 0
+  for (const r of rows ?? []) {
+    const source = translationSource({ title: r.ja_title, shortDescription: r.ja_short_description, description: r.ja_description }, config.summaryChars)
+    const hash = sourceContentHash(source)
+    await db.from('product_source_metadata').update({ ja_summary: source.summary ?? '', source_content_hash: hash }).eq('id', r.id)
+    if (hash !== r.translated_content_hash && !['rejected', 'archived'].includes(r.pipeline_status)) {
+      await queueTranslation(db, r.product_id!, hash)
+      queued++
+    }
+  }
+  return { summarised: rows?.length ?? 0, queued }
 }
 
 // One synchronisation run. `trigger: 'cron'` respects the configured
