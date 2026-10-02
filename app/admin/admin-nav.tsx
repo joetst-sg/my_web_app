@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  BarChart3, BookOpen, Building2, FileCheck2, Flag, FolderHeart, LayoutDashboard, LayoutTemplate, Package, Settings, Sparkles, Tags, Users,
+  BarChart3, BookOpen, Building2, FileCheck2, Flag, FolderHeart, LayoutDashboard, LayoutTemplate, Package, Settings, Sparkles, Sprout, Tags, Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,6 +12,7 @@ const groups = [
     ['/admin/dashboard', 'Dashboard', LayoutDashboard, false],
     ['/admin/submissions', 'Submissions', FileCheck2, false],
     ['/admin/products', 'Products', Package, false],
+    ['/admin/greenfunding', 'GREEN FUNDING', Sprout, true],
     ['/admin/featured', 'Featured', Sparkles, false],
     ['/admin/articles', 'Articles', BookOpen, false],
     ['/admin/content', 'Homepage', LayoutTemplate, false],

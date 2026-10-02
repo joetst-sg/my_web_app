@@ -7,7 +7,9 @@ import { localized } from '@/lib/i18n/content'
 
 // Normalises a product row (with relations) into the shape the product page,
 // the seller preview and the editor preview all render.
-export function toProductView(p: ProductDetail, locale: Locale = 'en'): ProductView {
+export type CampaignInfo = ProductView['campaign']
+
+export function toProductView(p: ProductDetail, locale: Locale = 'en', campaign: CampaignInfo = null): ProductView {
   const price = p.pricing?.price ?? p.price
   const compareAt = p.pricing?.compare_at_price ?? p.original_price
   return {
@@ -33,7 +35,7 @@ export function toProductView(p: ProductDetail, locale: Locale = 'en'): ProductV
     images: p.images.map((i) => ({
       id: i.id,
       src: productImageUrl(i.storage_path)!,
-      alt: i.alt || p.name,
+      alt: localized({ translations: (i as { translations?: unknown }).translations, alt: i.alt }, 'alt', locale) || p.name,
       width: i.width ?? 1200,
       height: i.height ?? 900,
     })),
@@ -41,6 +43,7 @@ export function toProductView(p: ProductDetail, locale: Locale = 'en'): ProductV
     specs: p.specs.map((s) => ({ label: s.label, value: s.value })),
     category: p.primaryCategory ? { slug: p.primaryCategory.slug, name: localized(p.primaryCategory, 'name', locale) } : null,
     tags: (p.tags ?? []).map((t) => t.tag).filter((t): t is { slug: string; name: string } => Boolean(t)),
+    campaign,
     score: p.score
       ? {
           overall: Number(p.score.overall),

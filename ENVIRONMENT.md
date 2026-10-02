@@ -22,3 +22,4 @@ Copy `.env.example` to `.env.local` for development. `.env.local` is git-ignored
 - The legacy `anon` JWT key also works as `NEXT_PUBLIC_SUPABASE_ANON_KEY`; new projects use `sb_publishable_…` keys.
 - Use the new `sb_secret_…` key (or the legacy service role key) for `SUPABASE_SERVICE_ROLE_KEY`.
 - After changing Vercel variables, redeploy.
+- GREEN FUNDING import and AI translation variables (`GREEN_FUNDING_*`, `TRANSLATION_*`) are listed with defaults in `.env.example` and explained in [GREENFUNDING.md](GREENFUNDING.md). All are server-only.

@@ -14,6 +14,7 @@ import { ReminderButton } from './reminder-button'
 import { ReportButton } from './report-button'
 import { SaveButton } from './save-button'
 import { ShareButton } from './share-button'
+import { RichText } from '@/components/common/rich-text'
 
 export type ProductView = {
   id: string
@@ -49,6 +50,18 @@ export type ProductView = {
   specs: { label: string; value: string }[]
   category: { slug: string; name: string } | null
   tags: { slug: string; name: string }[]
+  // Set for products imported from a crowdfunding source (GREEN FUNDING).
+  campaign?: {
+    sourceStatus: string
+    currency: string | null
+    goalAmount: number | null
+    raisedAmount: number | null
+    backerCount: number | null
+    daysRemaining: number | null
+    endsAt: string | null
+    endsAtEstimated: boolean
+    lastSyncedAt: string | null
+  } | null
   score: { overall: number; design: number | null; innovation: number | null; usability: number | null; value: number | null; features: number | null; verdict: string | null } | null
 }
 
@@ -113,14 +126,34 @@ export async function ProductDetailView({
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {p.external_url && !unavailable && <BuyButton productId={p.id} />}
+              {p.external_url && !unavailable && (p.campaign ? <BuyButton productId={p.id} label={t('product.gf.buy')} srLabel={t('product.gf.opens')} className="sm:min-w-64" /> : <BuyButton productId={p.id} />)}
               <SaveButton productId={p.id} productName={p.name} initialSaved={viewer?.saved} variant="full" />
               <AddToCollectionButton productId={p.id} productName={p.name} />
               <ReminderButton productId={p.id} productName={p.name} availability={p.availability} initialSet={viewer?.reminded} variant="full" />
               {shareUrl && <ShareButton url={shareUrl} title={p.name} productId={p.id} />}
             </div>
           )}
-          <p className="text-xs text-muted-foreground">{t('product.buyNote')}</p>
+          <p className="text-xs text-muted-foreground">{p.campaign ? t('product.gf.note') : t('product.buyNote')}</p>
+
+          {p.campaign && (
+            <section aria-labelledby="campaign" className="rounded-2xl border p-5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 id="campaign" className="font-sans text-base font-semibold tracking-normal">{t('product.gf.source')}</h2>
+                <StatusPill tone={p.campaign.sourceStatus === 'ended' || p.campaign.sourceStatus === 'cancelled' ? 'danger' : 'success'}>
+                  {p.campaign.sourceStatus === 'ended' ? t('product.gf.ended') : p.campaign.sourceStatus === 'cancelled' ? t('product.gf.cancelled') : p.campaign.sourceStatus === 'succeeded' ? t('product.gf.funded') : t('product.gf.live')}
+                </StatusPill>
+              </div>
+              <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                {p.campaign.raisedAmount !== null && <div><dt className="text-xs text-muted-foreground">{t('product.gf.raised')}</dt><dd className="font-semibold tabular-nums">{f.price(p.campaign.raisedAmount, p.campaign.currency ?? 'JPY')}</dd></div>}
+                {p.campaign.goalAmount !== null && <div><dt className="text-xs text-muted-foreground">{t('product.gf.goal')}</dt><dd className="font-semibold tabular-nums">{f.price(p.campaign.goalAmount, p.campaign.currency ?? 'JPY')}</dd></div>}
+                {p.campaign.backerCount !== null && <div><dt className="text-xs text-muted-foreground">{t('product.gf.backers')}</dt><dd className="font-semibold tabular-nums">{f.number(p.campaign.backerCount)}</dd></div>}
+              </dl>
+              {p.campaign.daysRemaining !== null && !['ended', 'cancelled'].includes(p.campaign.sourceStatus) && (
+                <p className="mt-3 text-sm">{t('product.gf.daysLeft', { days: p.campaign.daysRemaining })}</p>
+              )}
+              {p.campaign.lastSyncedAt && <p className="mt-2 text-xs text-muted-foreground">{t('product.gf.asOf', { date: f.date(p.campaign.lastSyncedAt) })}</p>}
+            </section>
+          )}
 
           {p.key_features.length > 0 && (
             <section aria-labelledby="features" className="rounded-2xl bg-surface p-5">
@@ -143,9 +176,7 @@ export async function ProductDetailView({
           {p.description && (
             <section aria-labelledby="about">
               <h2 id="about" className="font-display text-2xl font-bold">{t('product.about', { name: p.name })}</h2>
-              <div className="mt-4 flex max-w-[68ch] flex-col gap-4 leading-relaxed text-foreground/90">
-                {p.description.split(/\n{2,}/).map((para, i) => <p key={i}>{para}</p>)}
-              </div>
+              <RichText text={p.description} className="mt-4 flex max-w-[68ch] flex-col gap-4 leading-relaxed text-foreground/90" />
               {p.benefits.length > 0 && (
                 <ul className="mt-4 list-disc pl-5 text-foreground/90">
                   {p.benefits.map((b) => <li key={b}>{b}</li>)}

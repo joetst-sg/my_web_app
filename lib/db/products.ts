@@ -166,7 +166,7 @@ export const getProductBySlug = cache(async (slug: string) => {
       id, slug, name, tagline, description, translations, key_features, benefits, external_url, sku, currency, price, original_price,
       availability, status, published_at, updated_at, seller_id, seo_title, seo_description, save_count, view_count,
       brand:brands ( id, slug, name, tagline, description, logo_url, website_url, social_links, is_verified, follower_count ),
-      images:product_images ( id, storage_path, alt, width, height, position ),
+      images:product_images ( id, storage_path, alt, translations, width, height, position ),
       videos:product_videos ( id, url, provider, title, position ),
       specs:product_specifications ( id, label, value, position ),
       categories:product_categories ( is_primary, category:categories ( id, slug, name, parent_id, translations ) ),

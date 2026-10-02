@@ -10,11 +10,13 @@ import { buttonVariants } from '@/components/ui/button'
 export function BuyButton({
   productId,
   label,
+  srLabel,
   className,
   size = 'lg',
 }: {
   productId: string
   label?: string
+  srLabel?: string
   className?: string
   size?: 'lg' | 'default'
 }) {
@@ -28,7 +30,7 @@ export function BuyButton({
     >
       {label ?? t('product.buyNow')}
       <ArrowUpRight />
-      <span className="sr-only"> {t('product.opensMakerSite')}</span>
+      <span className="sr-only"> {srLabel ?? t('product.opensMakerSite')}</span>
     </a>
   )
 }

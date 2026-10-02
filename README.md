@@ -53,5 +53,6 @@ select id, 'admin' from auth.users where email = 'you@yourdomain.com';
 - [DATABASE.md](DATABASE.md) — schema, migrations, functions, jobs, seeding
 - [SECURITY.md](SECURITY.md) — RLS, roles, validation, uploads, secrets
 - [DEPLOYMENT.md](DEPLOYMENT.md) — Supabase + Vercel setup
+- [GREENFUNDING.md](GREENFUNDING.md) — GREEN FUNDING import, translation and review workflow
 - [ENVIRONMENT.md](ENVIRONMENT.md) — every environment variable
 - [CONTRIBUTING.md](CONTRIBUTING.md) — conventions and workflow

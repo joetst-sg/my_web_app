@@ -52,9 +52,24 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
   if (!raw) notFound()
   const product = localizeProduct(raw, locale)
 
-  const view = toProductView(product, locale)
   const viewer = await getViewer()
   const supabase = await createClient()
+  // Imported crowdfunding campaigns (GREEN FUNDING) show their campaign facts.
+  const { data: campaignRows } = await supabase.rpc('campaign_info', { p_product_id: product.id })
+  const c = campaignRows?.[0]
+  const view = toProductView(product, locale, c
+    ? {
+        sourceStatus: c.source_status,
+        currency: c.currency,
+        goalAmount: c.goal_amount === null ? null : Number(c.goal_amount),
+        raisedAmount: c.raised_amount === null ? null : Number(c.raised_amount),
+        backerCount: c.backer_count,
+        daysRemaining: c.days_remaining,
+        endsAt: c.campaign_ends_at,
+        endsAtEstimated: c.campaign_ends_at_estimated,
+        lastSyncedAt: c.last_synced_at,
+      }
+    : null)
 
   const viewerState = viewer
     ? await Promise.all([

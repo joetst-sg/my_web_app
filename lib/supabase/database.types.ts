@@ -544,6 +544,58 @@ export type Database = {
           },
         ]
       }
+      category_mappings: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          id: string
+          priority: number
+          source: string
+          source_category: string
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          priority?: number
+          source?: string
+          source_category: string
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          id?: string
+          priority?: number
+          source?: string
+          source_category?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_mappings_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "category_mappings_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "deal_cards"
+            referencedColumns: ["category_id"]
+          },
+          {
+            foreignKeyName: "category_mappings_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "product_cards"
+            referencedColumns: ["category_id"]
+          },
+        ]
+      }
       collection_followers: {
         Row: {
           collection_id: string
@@ -968,9 +1020,11 @@ export type Database = {
           created_at: string
           height: number | null
           id: string
+          original_url: string | null
           position: number
           product_id: string
           storage_path: string
+          translations: Json
           width: number | null
         }
         Insert: {
@@ -978,9 +1032,11 @@ export type Database = {
           created_at?: string
           height?: number | null
           id?: string
+          original_url?: string | null
           position?: number
           product_id: string
           storage_path: string
+          translations?: Json
           width?: number | null
         }
         Update: {
@@ -988,9 +1044,11 @@ export type Database = {
           created_at?: string
           height?: number | null
           id?: string
+          original_url?: string | null
           position?: number
           product_id?: string
           storage_path?: string
+          translations?: Json
           width?: number | null
         }
         Relationships: [
@@ -1118,6 +1176,145 @@ export type Database = {
           },
         ]
       }
+      product_source_metadata: {
+        Row: {
+          backer_count: number | null
+          campaign_ends_at: string | null
+          campaign_ends_at_estimated: boolean
+          campaign_starts_at: string | null
+          changed_fields: string[]
+          created_at: string
+          currency: string | null
+          days_remaining: number | null
+          goal_amount: number | null
+          id: string
+          import_mode: string
+          ja_description: string | null
+          ja_short_description: string | null
+          ja_title: string | null
+          last_error: string | null
+          last_synced_at: string | null
+          needs_category_review: boolean
+          owner_name: string | null
+          pipeline_status: string
+          price: number | null
+          product_id: string | null
+          raised_amount: number | null
+          raw_metadata: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source: string
+          source_campaign_id: string
+          source_categories: string[]
+          source_content_hash: string | null
+          source_last_updated_at: string | null
+          source_status: string
+          source_tags: string[]
+          source_url: string
+          translated_content_hash: string | null
+          update_available: boolean
+          updated_at: string
+        }
+        Insert: {
+          backer_count?: number | null
+          campaign_ends_at?: string | null
+          campaign_ends_at_estimated?: boolean
+          campaign_starts_at?: string | null
+          changed_fields?: string[]
+          created_at?: string
+          currency?: string | null
+          days_remaining?: number | null
+          goal_amount?: number | null
+          id?: string
+          import_mode?: string
+          ja_description?: string | null
+          ja_short_description?: string | null
+          ja_title?: string | null
+          last_error?: string | null
+          last_synced_at?: string | null
+          needs_category_review?: boolean
+          owner_name?: string | null
+          pipeline_status?: string
+          price?: number | null
+          product_id?: string | null
+          raised_amount?: number | null
+          raw_metadata?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_campaign_id: string
+          source_categories?: string[]
+          source_content_hash?: string | null
+          source_last_updated_at?: string | null
+          source_status?: string
+          source_tags?: string[]
+          source_url: string
+          translated_content_hash?: string | null
+          update_available?: boolean
+          updated_at?: string
+        }
+        Update: {
+          backer_count?: number | null
+          campaign_ends_at?: string | null
+          campaign_ends_at_estimated?: boolean
+          campaign_starts_at?: string | null
+          changed_fields?: string[]
+          created_at?: string
+          currency?: string | null
+          days_remaining?: number | null
+          goal_amount?: number | null
+          id?: string
+          import_mode?: string
+          ja_description?: string | null
+          ja_short_description?: string | null
+          ja_title?: string | null
+          last_error?: string | null
+          last_synced_at?: string | null
+          needs_category_review?: boolean
+          owner_name?: string | null
+          pipeline_status?: string
+          price?: number | null
+          product_id?: string | null
+          raised_amount?: number | null
+          raw_metadata?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source?: string
+          source_campaign_id?: string
+          source_categories?: string[]
+          source_content_hash?: string | null
+          source_last_updated_at?: string | null
+          source_status?: string
+          source_tags?: string[]
+          source_url?: string
+          translated_content_hash?: string | null
+          update_available?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_source_metadata_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "deal_cards"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_source_metadata_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "product_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_source_metadata_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_specifications: {
         Row: {
           id: string
@@ -1204,6 +1401,85 @@ export type Database = {
             columns: ["tag_id"]
             isOneToOne: false
             referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_translation_versions: {
+        Row: {
+          created_by: string | null
+          description: string | null
+          id: string
+          image_alts: Json
+          language: string
+          origin: string
+          product_id: string
+          seo_description: string | null
+          seo_title: string | null
+          short_description: string | null
+          source_content_hash: string | null
+          title: string | null
+          translated_at: string
+          translation_model: string | null
+          translation_provider: string | null
+          version: number
+        }
+        Insert: {
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_alts?: Json
+          language: string
+          origin: string
+          product_id: string
+          seo_description?: string | null
+          seo_title?: string | null
+          short_description?: string | null
+          source_content_hash?: string | null
+          title?: string | null
+          translated_at?: string
+          translation_model?: string | null
+          translation_provider?: string | null
+          version: number
+        }
+        Update: {
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_alts?: Json
+          language?: string
+          origin?: string
+          product_id?: string
+          seo_description?: string | null
+          seo_title?: string | null
+          short_description?: string | null
+          source_content_hash?: string | null
+          title?: string | null
+          translated_at?: string
+          translation_model?: string | null
+          translation_provider?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_translation_versions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "deal_cards"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "product_translation_versions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_translation_versions_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -1811,6 +2087,166 @@ export type Database = {
           },
         ]
       }
+      sync_logs: {
+        Row: {
+          campaign_id: string | null
+          campaign_url: string | null
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          id: number
+          message: string | null
+          operation: string
+          product_id: string | null
+          run_id: string | null
+          source: string
+          status: string
+        }
+        Insert: {
+          campaign_id?: string | null
+          campaign_url?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: never
+          message?: string | null
+          operation: string
+          product_id?: string | null
+          run_id?: string | null
+          source?: string
+          status: string
+        }
+        Update: {
+          campaign_id?: string | null
+          campaign_url?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: never
+          message?: string | null
+          operation?: string
+          product_id?: string | null
+          run_id?: string | null
+          source?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "deal_cards"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "sync_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_logs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "sync_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_runs: {
+        Row: {
+          discovered: number
+          error_count: number
+          finished_at: string | null
+          id: string
+          message: string | null
+          mode: string
+          new_count: number
+          requests: number
+          skipped_count: number
+          source: string
+          started_at: string
+          status: string
+          translated_count: number
+          trigger: string
+          updated_count: number
+        }
+        Insert: {
+          discovered?: number
+          error_count?: number
+          finished_at?: string | null
+          id?: string
+          message?: string | null
+          mode: string
+          new_count?: number
+          requests?: number
+          skipped_count?: number
+          source?: string
+          started_at?: string
+          status?: string
+          translated_count?: number
+          trigger: string
+          updated_count?: number
+        }
+        Update: {
+          discovered?: number
+          error_count?: number
+          finished_at?: string | null
+          id?: string
+          message?: string | null
+          mode?: string
+          new_count?: number
+          requests?: number
+          skipped_count?: number
+          source?: string
+          started_at?: string
+          status?: string
+          translated_count?: number
+          trigger?: string
+          updated_count?: number
+        }
+        Relationships: []
+      }
+      tag_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          source: string
+          source_tag: string
+          tag_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          source?: string
+          source_tag: string
+          tag_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          source?: string
+          source_tag?: string
+          tag_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tag_mappings_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tags: {
         Row: {
           created_at: string
@@ -1831,6 +2267,73 @@ export type Database = {
           slug?: string
         }
         Relationships: []
+      }
+      translation_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          max_attempts: number
+          product_id: string
+          run_after: string
+          source_content_hash: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          product_id: string
+          run_after?: string
+          source_content_hash: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          product_id?: string
+          run_after?: string
+          source_content_hash?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "translation_jobs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "deal_cards"
+            referencedColumns: ["product_id"]
+          },
+          {
+            foreignKeyName: "translation_jobs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "product_cards"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "translation_jobs_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -2014,6 +2517,22 @@ export type Database = {
         }
       }
       article_visible: { Args: { _article_id: string }; Returns: boolean }
+      campaign_info: {
+        Args: { p_product_id: string }
+        Returns: {
+          backer_count: number
+          campaign_ends_at: string
+          campaign_ends_at_estimated: boolean
+          currency: string
+          days_remaining: number
+          goal_amount: number
+          last_synced_at: string
+          raised_amount: number
+          source: string
+          source_status: string
+          source_url: string
+        }[]
+      }
       can_edit_brand: { Args: { _brand_id: string }; Returns: boolean }
       can_edit_collection: {
         Args: { _collection_id: string }
@@ -2050,6 +2569,7 @@ export type Database = {
           status: Database["public"]["Enums"]["product_status"]
         }[]
       }
+      greenfunding_tick: { Args: never; Returns: undefined }
       has_role: {
         Args: { _role: Database["public"]["Enums"]["app_role"] }
         Returns: boolean

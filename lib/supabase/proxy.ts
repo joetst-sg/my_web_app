@@ -28,6 +28,17 @@ function isDocumentRequest(request: NextRequest) {
 // way round, and never against an explicit choice.
 export async function updateSession(request: NextRequest) {
   const { pathname, search } = request.nextUrl
+
+  // Alternative language prefixes (/en/…, /zh-tw/…) permanently redirect to
+  // the site's canonical URLs (/… and /zh/…).
+  const alias = pathname.match(/^\/(en|zh-tw|zh-hk|zh-hant)(?=\/|$)/i)
+  if (alias) {
+    const url = request.nextUrl.clone()
+    const rest = pathname.slice(alias[0].length) || '/'
+    url.pathname = alias[1].toLowerCase() === 'en' ? rest : localizePath(rest, 'zh-HK')
+    return NextResponse.redirect(url, 308)
+  }
+
   const { locale, path } = splitLocale(pathname)
 
   // Language switcher links carry ?set-lang=<locale>: remember the choice and
