@@ -4,7 +4,7 @@ import { greenFundingConfig } from '@/lib/greenfunding/config'
 import { changedFields, eligibility, needsTranslationReview, sourceContentHash, translationSource } from '@/lib/greenfunding/content'
 import { actionForListedCampaign, applyTranslationAutomatically, nextAttempt, pipelineAfterTranslation, shouldCheckForUpdates, syncIsDue } from '@/lib/greenfunding/decide'
 import { imagePath, imageSize, importImages } from '@/lib/greenfunding/images'
-import { normalizeTag, resolveCategory } from '@/lib/greenfunding/mapping'
+import { categoryFromKeywords, chooseCategory, normalizeTag, resolveCategory } from '@/lib/greenfunding/mapping'
 import { htmlToText, parseCampaignList, parseCampaignPage } from '@/lib/greenfunding/parse'
 import { HtmlCampaignSource } from '@/lib/greenfunding/sources/html'
 import { RequestBudgetExceeded, SourceError } from '@/lib/greenfunding/types'
@@ -205,6 +205,24 @@ describe('category mapping', () => {
   })
   it('leaves the product uncategorized when nothing is mapped', () => {
     expect(resolveCategory(['ガジェット', '雑貨'], mappings)).toBeNull()
+  })
+  it('falls back to keywords, before broad mappings', () => {
+    const slugs = new Map([['audio', 'audio-id'], ['office', 'office-id'], ['hobbies', 'hobbies-id'], ['photography', 'photo-id']])
+    const maps = [...mappings, { source_category: '雑貨', category_id: 'hobbies-id', priority: 90 }]
+    // A specific mapping wins.
+    expect(chooseCategory({ sourceCategories: ['オーディオ', '雑貨'], title: 'カメラ', summary: null }, maps, slugs)).toBe('audio-id')
+    // No specific mapping: keywords beat the broad 雑貨 mapping.
+    expect(chooseCategory({ sourceCategories: ['ガジェット', '雑貨'], title: '4Kカメラ付きジンバル', summary: null }, maps, slugs)).toBe('photo-id')
+    // Nothing else: the broad mapping is used.
+    expect(chooseCategory({ sourceCategories: ['雑貨'], title: '新しい暮らしの道具', summary: null }, maps, slugs)).toBe('hobbies-id')
+    expect(chooseCategory({ sourceCategories: ['ガジェット'], title: '新しい暮らしの道具', summary: null }, maps, slugs)).toBeNull()
+  })
+  it('recognises common product words', () => {
+    expect(categoryFromKeywords('完全ワイヤレスイヤホン', null)).toBe('audio')
+    expect(categoryFromKeywords('ノートPCスタンド', null)).toBe('office')
+    expect(categoryFromKeywords('爬虫類かるた', null)).toBe('hobbies')
+    expect(categoryFromKeywords('オリジナル写真集', null)).toBe('books')
+    expect(categoryFromKeywords('タイトル', 'AI搭載の翻訳機')).toBe('ai-gadgets')
   })
   it('normalises tags without merging different words', () => {
     expect(normalizeTag('ＡＩ  搭載')).toBe('ai 搭載')

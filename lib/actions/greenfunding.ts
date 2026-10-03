@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { getViewer } from '@/lib/auth'
 import type { ActionResult } from '@/lib/errors'
 import { greenFundingConfig } from '@/lib/greenfunding/config'
-import { backfillSummaries, runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
+import { backfillCategories, backfillSummaries, runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
 import { sourceContentHash, translationSource } from '@/lib/greenfunding/content'
 import { campaignIdFromUrl, validateCampaignUrl } from '@/lib/greenfunding/url'
 import { publishImport } from '@/lib/greenfunding/publish'
@@ -246,8 +246,9 @@ export async function saveCategoryMapping(sourceCategory: string, categoryId: st
   if (!label.success || (categoryId !== null && !uuid.safeParse(categoryId).success)) return { ok: false, error: 'Invalid mapping.' }
   const { error } = await a.db.from('category_mappings').upsert({ source: 'greenfunding', source_category: label.data, category_id: categoryId }, { onConflict: 'source,source_category' })
   if (error) return { ok: false, error: error.message }
+  const { categorized } = await backfillCategories(a.db)
   refresh()
-  return { ok: true, message: 'Mapping saved. It applies to future imports.' }
+  return { ok: true, message: categorized ? `Mapping saved and ${categorized} uncategorized product(s) categorized.` : 'Mapping saved. It applies to future imports.' }
 }
 
 // Saves an administrator-edited Japanese summary (what gets translated) and

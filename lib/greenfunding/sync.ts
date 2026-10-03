@@ -6,7 +6,7 @@ import { greenFundingConfig, type GreenFundingConfig } from './config'
 import { changedFields, eligibility, needsTranslationReview, sourceContentHash, translationSource } from './content'
 import { actionForListedCampaign, shouldCheckForUpdates, syncIsDue } from './decide'
 import { IMAGE_BUCKET, importImages } from './images'
-import { resolveCategory, type CategoryMapping } from './mapping'
+import { chooseCategory, type CategoryMapping } from './mapping'
 import { createCampaignSource } from './sources'
 import { RequestBudgetExceeded, SourceError, type CampaignSource, type SourceCampaign } from './types'
 import { hostAllowed, validateCampaignUrl } from './url'
@@ -159,7 +159,17 @@ async function queueTranslation(db: Db, productId: string, hash: string) {
 
 // Imports one new campaign. Either a complete draft product is created, or
 // nothing is (the registry row records the error and the next run retries).
-async function importCampaign(db: Db, config: GreenFundingConfig, runId: string, campaign: SourceCampaign, mappings: CategoryMapping[]) {
+type Taxonomy = { mappings: CategoryMapping[]; slugToId: Map<string, string> }
+
+async function loadTaxonomy(db: Db): Promise<Taxonomy> {
+  const [{ data: mappingRows }, { data: cats }] = await Promise.all([
+    db.from('category_mappings').select('source_category, category_id, priority').eq('source', SOURCE),
+    db.from('categories').select('id, slug'),
+  ])
+  return { mappings: (mappingRows ?? []) as CategoryMapping[], slugToId: new Map((cats ?? []).map((c) => [c.slug, c.id])) }
+}
+
+async function importCampaign(db: Db, config: GreenFundingConfig, runId: string, campaign: SourceCampaign, taxonomy: Taxonomy) {
   const started = Date.now()
   const base = { runId, campaignId: campaign.campaignId, campaignUrl: campaign.url }
   const registryFields = {
@@ -212,7 +222,11 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
     const hash = sourceContentHash(translationSource(campaign, config.summaryChars))
     const brandId = await findOrCreateBrand(db, campaign.ownerName)
     await rememberSourceCategories(db, campaign.categories)
-    const categoryId = resolveCategory(campaign.categories, mappings)
+    const categoryId = chooseCategory(
+      { sourceCategories: campaign.categories, title: campaign.title, summary: translationSource(campaign, config.summaryChars).summary },
+      taxonomy.mappings,
+      taxonomy.slugToId,
+    )
 
     const { data: product, error: productError } = await db
       .from('products')
@@ -372,6 +386,36 @@ export async function backfillSummaries(db: Db, config: GreenFundingConfig = gre
   return { summarised: rows?.length ?? 0, queued }
 }
 
+// Gives uncategorized imports a category when the mappings or keywords now
+// allow one (e.g. after a mapping was added in the admin). No network calls.
+export async function backfillCategories(db: Db) {
+  const { data: rows } = await db
+    .from('product_source_metadata')
+    .select('id, product_id, source_categories, ja_title, ja_summary')
+    .eq('source', SOURCE)
+    .eq('needs_category_review', true)
+    .not('product_id', 'is', null)
+    .limit(50)
+  if (!rows?.length) return { categorized: 0 }
+  const taxonomy = await loadTaxonomy(db)
+  let categorized = 0
+  for (const r of rows) {
+    const { count } = await db.from('product_categories').select('product_id', { count: 'exact', head: true }).eq('product_id', r.product_id!)
+    if ((count ?? 0) > 0) {
+      await db.from('product_source_metadata').update({ needs_category_review: false }).eq('id', r.id)
+      continue
+    }
+    const categoryId = chooseCategory({ sourceCategories: r.source_categories, title: r.ja_title, summary: r.ja_summary }, taxonomy.mappings, taxonomy.slugToId)
+    if (!categoryId) continue
+    const { error } = await db.from('product_categories').insert({ product_id: r.product_id!, category_id: categoryId, is_primary: true })
+    if (!error) {
+      await db.from('product_source_metadata').update({ needs_category_review: false }).eq('id', r.id)
+      categorized++
+    }
+  }
+  return { categorized }
+}
+
 // One synchronisation run. `trigger: 'cron'` respects the configured
 // interval; `manual` (Sync Now) always runs.
 export async function runSync(trigger: 'cron' | 'manual', options: { source?: CampaignSource } = {}): Promise<SyncResult> {
@@ -403,8 +447,7 @@ export async function runSync(trigger: 'cron' | 'manual', options: { source?: Ca
 
   try {
     source = options.source ?? createCampaignSource(config)
-    const { data: mappingRows } = await db.from('category_mappings').select('source_category, category_id, priority').eq('source', SOURCE)
-    const mappings = (mappingRows ?? []) as CategoryMapping[]
+    const taxonomy = await loadTaxonomy(db)
 
     // 1. New campaigns.
     const refs = await source.listNewCampaigns()
@@ -425,7 +468,7 @@ export async function runSync(trigger: 'cron' | 'manual', options: { source?: Ca
       const started = Date.now()
       try {
         const campaign = await source.fetchCampaign(ref)
-        const outcome = await importCampaign(db, config, runId, campaign, mappings)
+        const outcome = await importCampaign(db, config, runId, campaign, taxonomy)
         if (outcome === 'new') result.newProducts++
         else result.skipped++
       } catch (e) {
