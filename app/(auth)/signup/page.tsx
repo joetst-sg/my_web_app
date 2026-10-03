@@ -19,6 +19,9 @@ export default async function SignupPage({ searchParams }: PageProps<'/signup'>)
       <h1 className="font-display text-3xl font-bold">{t('auth.signup.heading')}</h1>
       <p className="mb-6 mt-1 text-muted-foreground">{t('auth.signup.intro')}</p>
       <SignupForm next={next} />
+      <p className="mt-4 text-center text-sm text-muted-foreground">
+        {t('auth.code.signupAlt')} <Link href="/login?method=code" className="font-medium text-foreground underline underline-offset-4">{t('auth.code.signupAltLink')}</Link>
+      </p>
       <p className="mt-6 text-center text-sm text-muted-foreground">
         {t('auth.signup.haveAccount')} <Link href="/login" className="font-medium text-foreground underline underline-offset-4">{t('auth.login.submit')}</Link>
       </p>

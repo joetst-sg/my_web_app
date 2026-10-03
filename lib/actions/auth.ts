@@ -133,3 +133,46 @@ export async function changeEmail(_: FormState, formData: FormData): Promise<For
   if (error) return { error: translateAuthError(error.message, t) }
   return { message: t('auth.emailChangeSent') }
 }
+
+// ---------------------------------------------------------------------------
+// Login with a 6-digit code sent by email (Supabase email OTP).
+// New emails get an account automatically (then the usual onboarding).
+// ---------------------------------------------------------------------------
+
+export async function requestLoginCode(_: FormState, formData: FormData): Promise<FormState> {
+  const parsed = z.object({ email }).safeParse({ email: formData.get('email') })
+  if (!parsed.success) return { fieldErrors: (await fieldErrorTranslator())(parsed.error.flatten().fieldErrors) }
+  const { t, locale } = await getI18n()
+  const supabase = await createClient()
+  const next = safeNext(formData.get('next') as string | null, '/')
+  const { error } = await supabase.auth.signInWithOtp({
+    email: parsed.data.email,
+    options: {
+      shouldCreateUser: true,
+      data: { locale },
+      // The email also contains a one-click link as a fallback.
+      emailRedirectTo: `${await origin()}/auth/confirm?next=${encodeURIComponent(localizePath(next, locale))}`,
+    },
+  })
+  if (error) return { error: translateAuthError(error.message, t) }
+  return { message: t('auth.code.sent', { email: parsed.data.email }) }
+}
+
+export async function verifyLoginCode(_: FormState, formData: FormData): Promise<FormState> {
+  const parsed = z
+    .object({ email, token: z.string().trim().regex(/^\d{6}$/, 'v.code') })
+    .safeParse({ email: formData.get('email'), token: String(formData.get('token') ?? '').replace(/\s+/g, '') })
+  if (!parsed.success) return { fieldErrors: (await fieldErrorTranslator())(parsed.error.flatten().fieldErrors) }
+  const { t } = await getI18n()
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.verifyOtp({ email: parsed.data.email, token: parsed.data.token, type: 'email' })
+  if (error || !data.user) {
+    const m = (error?.message ?? '').toLowerCase()
+    if (/token|otp|expired|invalid/.test(m)) return { fieldErrors: { token: [t('auth.errors.codeInvalid')] } }
+    return { error: translateAuthError(error?.message, t) }
+  }
+  // New accounts choose a username and interests first.
+  const { data: settings } = await supabase.from('user_settings').select('onboarded_at').eq('user_id', data.user.id).maybeSingle()
+  if (!settings?.onboarded_at) return redirect('/onboarding')
+  return redirect(safeNext(formData.get('next') as string | null, '/'))
+}

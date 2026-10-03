@@ -69,6 +69,7 @@ export function translateAuthError(message: string | undefined, t: Translate): s
   if (m.includes('invalid login credentials')) return t('auth.errors.invalidCredentials')
   if (m.includes('email not confirmed')) return t('auth.errors.notConfirmed')
   if (m.includes('already registered')) return t('auth.errors.alreadyRegistered')
+  if (m.includes('only request this after') || m.includes('security purposes')) return t('auth.errors.waitBeforeResend')
   if (m.includes('rate limit') || m.includes('too many')) return t('auth.errors.rateLimited')
   if (m.includes('password should')) return t('auth.errors.weakPassword')
   if (m.includes('expired') || (m.includes('invalid') && m.includes('token'))) return t('auth.errors.linkExpired')
