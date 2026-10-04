@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import {
-  BarChart3, BookOpen, Building2, FileCheck2, Flag, FolderHeart, LayoutDashboard, LayoutTemplate, Package, Settings, Sparkles, Sprout, Tags, Users,
+  BarChart3, BookOpen, Building2, FileCheck2, Flag, FolderHeart, LayoutDashboard, LayoutTemplate, Package, Rocket, Settings, Sparkles, Sprout, Tags, Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -12,7 +12,8 @@ const groups = [
     ['/admin/dashboard', 'Dashboard', LayoutDashboard, false],
     ['/admin/submissions', 'Submissions', FileCheck2, false],
     ['/admin/products', 'Products', Package, false],
-    ['/admin/greenfunding', 'GREEN FUNDING', Sprout, true],
+    ['/admin/greenfunding?source=greenfunding', 'GREEN FUNDING', Sprout, true],
+    ['/admin/greenfunding?source=indiegogo', 'Indiegogo', Rocket, true],
     ['/admin/featured', 'Featured', Sparkles, false],
     ['/admin/articles', 'Articles', BookOpen, false],
     ['/admin/content', 'Homepage', LayoutTemplate, false],
@@ -32,6 +33,14 @@ const groups = [
 
 export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
+  // Links with ?source=… are active only for that source.
+  const isActive = (href: string) => {
+    const [path, query] = href.split('?')
+    if (!pathname.startsWith(path)) return false
+    const want = new URLSearchParams(query).get('source')
+    return !want || searchParams.get('source') === want
+  }
   return (
     <nav aria-label="Admin" className="border-b bg-background lg:w-60 lg:shrink-0 lg:border-b-0 lg:border-r">
       <div className="flex gap-4 overflow-x-auto px-4 py-3 lg:sticky lg:top-16 lg:flex-col lg:gap-6 lg:py-6">
@@ -39,7 +48,7 @@ export function AdminNav({ isAdmin }: { isAdmin: boolean }) {
           <div key={title} className="flex shrink-0 gap-1 lg:flex-col">
             <p className="eyebrow hidden px-3 pb-1 lg:block">{title}</p>
             {items.filter(([, , , adminOnly]) => isAdmin || !adminOnly).map(([href, label, Icon]) => {
-              const active = pathname.startsWith(href)
+              const active = isActive(href)
               return (
                 <Link
                   key={href}

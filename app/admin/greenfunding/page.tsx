@@ -17,7 +17,7 @@ import { createClient } from '@/lib/supabase/server'
 import { MappingRow } from './mapping-form'
 import { CampaignPill, fmtDate, PipelinePill, translationState } from './shared'
 
-export const metadata: Metadata = { title: 'GREEN FUNDING' }
+export const metadata: Metadata = { title: 'Crowdfunding imports' }
 // Sync Now / Translate now run in this request.
 export const maxDuration = 300
 
@@ -54,14 +54,21 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
 
   const [{ data: rows }, { data: counts }, { data: lastRun }, { data: jobs }, { data: mappings }, { data: categories }] = await Promise.all([
     q.order('created_at', { ascending: false }).limit(100),
-    supabase.from('product_source_metadata').select('pipeline_status, update_available, product_id'),
+    supabase.from('product_source_metadata').select('source, pipeline_status, update_available, product_id'),
     supabase.from('sync_runs').select('*').order('started_at', { ascending: false }).limit(20),
     supabase.from('translation_jobs').select('product_id, status, attempts, max_attempts, created_at').order('created_at', { ascending: false }).limit(500),
     supabase.from('category_mappings').select('source_category, category_id, priority').eq('source', 'greenfunding').order('priority').order('source_category'),
     supabase.from('categories').select('id, name, parent_id, sort_order').order('sort_order'),
   ])
 
-  const count = (statuses: string[]) => (counts ?? []).filter((c) => statuses.includes(c.pipeline_status)).length
+  // Everything below (cards, status, mapping) follows the chosen source.
+  const allCounts = counts ?? []
+  const scoped = sourceFilter ? allCounts.filter((c) => c.source === sourceFilter) : allCounts
+  const scopedProducts = new Set(scoped.map((c) => c.product_id).filter(Boolean))
+  const scopedJobs = (jobs ?? []).filter((j) => scopedProducts.has(j.product_id))
+  const shownDefs = sourceFilter ? defs.filter((d) => d.key === sourceFilter) : defs
+  const current = sourceFilter ? defs.find((d) => d.key === sourceFilter)! : null
+  const count = (statuses: string[]) => scoped.filter((c) => statuses.includes(c.pipeline_status)).length
   const latestJob = new Map<string, NonNullable<typeof jobs>[number]>()
   for (const j of jobs ?? []) if (!latestJob.has(j.product_id)) latestJob.set(j.product_id, j)
   const lastRunBySource = new Map<string, NonNullable<typeof lastRun>[number]>()
@@ -73,9 +80,10 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
     ['Rejected', count(['rejected', 'archived'])],
     ['Failed', count(['sync_error', 'failed'])],
     ['Possible duplicates', count(['duplicate'])],
-    ['Updates available', (counts ?? []).filter((c) => c.update_available).length],
-    ['Products imported', (counts ?? []).filter((c) => c.product_id).length],
-    ['Awaiting translation', (jobs ?? []).filter((j) => j.status === 'queued' || j.status === 'running').length],
+    ['Not eligible', count(['not_eligible'])],
+    ['Updates available', scoped.filter((c) => c.update_available).length],
+    ['Products imported', scoped.filter((c) => c.product_id).length],
+    ['Awaiting AI / translation', scopedJobs.filter((j) => j.status === 'queued' || j.status === 'running').length],
   ] as const
 
   return (
@@ -83,7 +91,7 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow">Import</p>
-          <h1 className="font-display text-3xl font-bold">Crowdfunding imports</h1>
+          <h1 className="font-display text-3xl font-bold">{current ? `${current.displayName} imports` : 'Crowdfunding imports'}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             {config.mode === 'production' && config.autoPublish
               ? 'New campaigns are imported, translated to English and Traditional Chinese, and published automatically once the safety checks pass. Anything that fails a check waits here for review.'
@@ -104,7 +112,7 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
           <span><strong>Content:</strong> {ai.provider && ai.apiKey ? `AI summaries · ${ai.provider} · ${ai.model}` : tconfig.apiKey ? `machine translation · ${tconfig.provider} (Green Funding only)` : <span className="text-destructive">no AI_API_KEY or TRANSLATION_API_KEY set</span>}</span>
         </div>
         <ul className="mt-2 flex flex-col gap-1 text-muted-foreground">
-          {defs.map((d) => {
+          {shownDefs.map((d) => {
             const run = lastRunBySource.get(d.key)
             const next = run ? new Date(Date.parse(run.started_at) + d.config.syncIntervalMinutes * 60_000).toISOString() : null
             return (
@@ -118,6 +126,17 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
         </ul>
       </div>
 
+      <nav className="flex flex-wrap gap-2 border-b" aria-label="Source">
+        {[[null, 'All sources'] as const, ...defs.map((d) => [d.key, d.displayName] as const)].map(([key, label]) => {
+          const n = key ? allCounts.filter((c) => c.source === key && c.product_id).length : allCounts.filter((c) => c.product_id).length
+          return (
+            <Link key={label} href={key ? `/admin/greenfunding?source=${key}` : '/admin/greenfunding'} aria-current={sourceFilter === key ? 'page' : undefined} className={cn('-mb-px border-b-2 px-4 py-2 text-sm font-medium', sourceFilter === key ? 'border-foreground text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+              {label} <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs tabular-nums">{n}</span>
+            </Link>
+          )
+        })}
+      </nav>
+
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {stats.map(([label, value]) => (
           <div key={label} className="rounded-2xl border bg-background p-4">
@@ -128,11 +147,6 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
       </div>
 
       <section className="flex flex-col gap-4">
-        <nav className="flex flex-wrap gap-1" aria-label="Filter by source">
-          {[[null, 'All sources'] as const, ...defs.map((d) => [d.key, d.displayName] as const)].map(([key, label]) => (
-            <Link key={label} href={key ? `/admin/greenfunding?source=${key}` : '/admin/greenfunding'} className={cn('rounded-full border px-3 py-1 text-xs', sourceFilter === key ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted')}>{label}</Link>
-          ))}
-        </nav>
         <nav className="flex flex-wrap gap-1" aria-label="Filter imports">
           {[...FILTERS.map(([k, label]) => [k, label] as const), ['updates', 'Update available'] as const].map(([k, label]) => {
             const active = k === 'updates' ? updatesOnly : !updatesOnly && filter[0] === k
@@ -145,7 +159,7 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
         </nav>
 
         {(rows ?? []).length === 0 ? (
-          <EmptyState icon={Sprout} title="Nothing here yet" description="Click “Sync now” to check GREEN FUNDING for new campaigns." />
+          <EmptyState icon={Sprout} title="Nothing here yet" description={current && !current.config.enabled ? `${current.displayName} imports are switched off.` : `Click “Sync now” to check ${current?.displayName ?? 'the sources'} for new campaigns.`} />
         ) : (
           <ul className="flex flex-col gap-3">
             {rows!.map((r) => {
@@ -180,7 +194,7 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
                   <div className="flex shrink-0 flex-wrap gap-2 lg:w-56 lg:flex-col">
                     {p && <Button asChild size="sm"><Link href={`/admin/greenfunding/${p.id}`}>Review / Edit</Link></Button>}
                     {p && p.status !== 'published' && translated && (
-                      <ActionButton action={approveAndPublish.bind(null, p.id)} size="sm" confirm={{ title: 'Approve and publish?', description: 'The product becomes public in English and Traditional Chinese, with Buy Now linking to the GREEN FUNDING campaign.', confirmLabel: 'Approve & publish' }}>
+                      <ActionButton action={approveAndPublish.bind(null, p.id)} size="sm" confirm={{ title: 'Approve and publish?', description: `The product becomes public in English and Traditional Chinese, with Buy Now linking to the ${r.source_name ?? r.source} campaign.`, confirmLabel: 'Approve & publish' }}>
                         Approve &amp; Publish
                       </ActionButton>
                     )}
@@ -189,7 +203,7 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
                         Reject
                       </ActionButton>
                     )}
-                    <Button asChild size="sm" variant="ghost"><a href={r.source_url} target="_blank" rel="noopener noreferrer"><ExternalLink />Open GREEN FUNDING</a></Button>
+                    <Button asChild size="sm" variant="ghost"><a href={r.source_url} target="_blank" rel="noopener noreferrer"><ExternalLink />Open on {r.source_name ?? r.source}</a></Button>
                   </div>
                 </li>
               )
@@ -198,15 +212,15 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
         )}
       </section>
 
-      <section className="rounded-2xl border bg-background p-5">
-        <h2 className="font-sans text-base font-semibold tracking-normal">Category mapping</h2>
+      {sourceFilter !== 'indiegogo' && <section className="rounded-2xl border bg-background p-5">
+        <h2 className="font-sans text-base font-semibold tracking-normal">GREEN FUNDING category mapping</h2>
         <p className="mb-3 text-sm text-muted-foreground">
           GREEN FUNDING categories → site categories. When a campaign has several, the first mapped one in this list wins. Unmapped categories leave the product “Uncategorized” for you to choose during review. New GREEN FUNDING categories appear here automatically.
         </p>
         <div className="divide-y">
           {(mappings ?? []).map((m) => <MappingRow key={m.source_category} label={m.source_category} categoryId={m.category_id} categories={categories ?? []} />)}
         </div>
-      </section>
+      </section>}
     </div>
   )
 }
