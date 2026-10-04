@@ -11,7 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { resetSummary, saveSummaryAndTranslate, saveTranslations, updateCampaignUrl } from '@/lib/actions/greenfunding'
 
 export type Texts = { title: string; short_description: string; description: string; seo_title: string; seo_description: string }
-type Source = { title: string | null; short_description: string | null; description: string | null; summary: string | null; summaryEdited: boolean }
+type Source = { title: string | null; short_description: string | null; description: string | null; summary: string | null; summaryEdited: boolean; language: string }
 
 const FIELDS: [keyof Texts, string, number, boolean][] = [
   ['title', 'Title', 120, false],
@@ -51,14 +51,14 @@ export function TranslationEditor({ productId, source, en: initialEn, zh: initia
     <div className="flex flex-col gap-4">
       <div className="grid gap-6 xl:grid-cols-3">
         <div className="flex min-w-0 flex-col gap-3" lang="ja">
-          <h3 className="font-sans text-sm font-semibold tracking-normal">Original Japanese <span className="font-normal text-muted-foreground">(read-only source)</span></h3>
+          <h3 className="font-sans text-sm font-semibold tracking-normal">Original {source.language === 'ja' ? 'Japanese' : 'source text'} <span className="font-normal text-muted-foreground">(read-only)</span></h3>
           {([['Title', source.title], ['Short description', source.short_description]] as const).map(([name, text]) => (
             <div key={name} className="flex flex-col gap-1.5">
               <p className="text-xs text-muted-foreground">{name}</p>
               <div className="whitespace-pre-wrap rounded-lg border bg-muted/40 px-3 py-2 text-sm">{text ?? '—'}</div>
             </div>
           ))}
-          <SummaryEditor productId={productId} summary={source.summary} edited={source.summaryEdited} />
+          {source.language === 'ja' && <SummaryEditor productId={productId} summary={source.summary} edited={source.summaryEdited} />}
           <details className="rounded-lg border bg-muted/20 px-3 py-2 text-sm">
             <summary className="cursor-pointer text-xs text-muted-foreground">Full campaign description (reference only, not translated)</summary>
             <div className="mt-2 max-h-[30rem] overflow-y-auto whitespace-pre-wrap">{source.description ?? '—'}</div>

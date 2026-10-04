@@ -2,7 +2,8 @@ import 'server-only'
 import { createServiceClient } from '@/lib/supabase/server'
 import { greenFundingConfig } from './config'
 import { logSync } from './sync'
-import { validateCampaignUrl } from './url'
+import { sourceDefinition } from './sources'
+import { validateSourceUrl } from './url'
 
 type Db = NonNullable<ReturnType<typeof createServiceClient>>
 
@@ -26,20 +27,24 @@ export async function publishImport(
   if (config.mode !== 'production') return { ok: false, error: 'Test mode: publishing is disabled. Set GREEN_FUNDING_IMPORT_MODE=production to publish.' }
 
   const [{ data: meta }, { data: product }, { data: cats }] = await Promise.all([
-    db.from('product_source_metadata').select('id, source_url, source_campaign_id, source_status, translated_content_hash').eq('product_id', productId).maybeSingle(),
+    db.from('product_source_metadata').select('id, source, source_url, source_campaign_id, source_status, translated_content_hash').eq('product_id', productId).maybeSingle(),
     db.from('products').select('id, slug, name, status, external_url, brand_id, translations').eq('id', productId).maybeSingle(),
     db.from('product_categories').select('category_id').eq('product_id', productId),
   ])
   if (!meta || !product) return { ok: false, error: 'This is not an imported GREEN FUNDING product.' }
   if (product.status === 'published') return { ok: true, slug: product.slug }
 
-  const check = validateCampaignUrl(meta.source_url, config.allowedDomains)
+  const def = sourceDefinition(meta.source)
+  if (!def) return { ok: false, error: `Unknown source "${meta.source}".` }
+  const check = validateSourceUrl(meta.source_url, def.config.allowedDomains, def.campaignPath)
   if (!check.ok) return { ok: false, error: `Campaign URL rejected: ${check.reason}` }
   if (product.external_url !== meta.source_url) return { ok: false, error: 'The Buy Now URL does not match the imported campaign URL. Fix the campaign URL first.' }
   if (!meta.translated_content_hash) return { ok: false, error: 'Translations are not ready yet.' }
   const zh = (product.translations as Record<string, Record<string, string>> | null)?.['zh-HK']
   if (!product.name || !zh?.name) return { ok: false, error: 'English and Traditional Chinese titles are both required.' }
-  if (['ended', 'cancelled'].includes(meta.source_status)) return { ok: false, error: `The campaign is ${meta.source_status} on GREEN FUNDING.` }
+  if (['ended', 'cancelled'].includes(meta.source_status)) return { ok: false, error: `The campaign has ${meta.source_status === 'ended' ? 'ended' : 'been cancelled'}.` }
+  const { count: images } = await db.from('product_images').select('id', { count: 'exact', head: true }).eq('product_id', productId)
+  if (!images) return { ok: false, error: 'The product has no image.' }
   const hasCategory = Boolean(cats?.length)
   if (by.kind === 'admin' && !hasCategory) return { ok: false, error: 'Choose a category before publishing.' }
 
@@ -58,6 +63,7 @@ export async function publishImport(
     })
     .eq('id', meta.id)
   await logSync(db, {
+    source: meta.source,
     operation: 'publish',
     status: 'success',
     campaignId: meta.source_campaign_id,
@@ -81,13 +87,23 @@ export async function publishImport(
 export async function autoPublishIfEnabled(db: Db, productId: string) {
   const config = greenFundingConfig()
   if (!config.autoPublish || config.mode !== 'production') return null
+  const { data: meta } = await db.from('product_source_metadata').select('id, source, source_campaign_id, source_url').eq('product_id', productId).maybeSingle()
+  const log = { source: meta?.source, campaignId: meta?.source_campaign_id, campaignUrl: meta?.source_url, productId }
+
+  // Conservative duplicate check: a possible match with an already published
+  // product is held back instead of published.
+  const { data: dupes } = await db.rpc('crowdfunding_duplicate_candidates', { _product_id: productId })
+  if (dupes?.length) {
+    const reason = `Possible duplicate of ${dupes.map((d) => `“${d.name}” (${d.reason})`).join(', ')}`
+    if (meta) await db.from('product_source_metadata').update({ pipeline_status: 'duplicate', last_error: reason.slice(0, 2000) }).eq('id', meta.id)
+    await logSync(db, { ...log, operation: 'publish', status: 'warning', message: 'Not published — possible duplicate', error: reason })
+    return { ok: false as const, error: reason }
+  }
+
   const res = await publishImport(db, productId, { kind: 'auto' })
-  if (!res.ok) {
-    const { data: meta } = await db.from('product_source_metadata').select('id, source_campaign_id, source_url').eq('product_id', productId).maybeSingle()
-    if (meta) {
-      await db.from('product_source_metadata').update({ last_error: `Not published automatically: ${res.error}` }).eq('id', meta.id)
-      await logSync(db, { operation: 'publish', status: 'warning', campaignId: meta.source_campaign_id, campaignUrl: meta.source_url, productId, message: 'Not published automatically — left for review', error: res.error })
-    }
+  if (!res.ok && meta) {
+    await db.from('product_source_metadata').update({ pipeline_status: 'failed', last_error: `Not published automatically: ${res.error}` }).eq('id', meta.id)
+    await logSync(db, { ...log, operation: 'publish', status: 'warning', message: 'Not published automatically — validation failed', error: res.error })
   }
   return res
 }

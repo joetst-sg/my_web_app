@@ -59,6 +59,7 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
   const c = campaignRows?.[0]
   const view = toProductView(product, locale, c
     ? {
+        sourceName: c.source_name ?? 'GREEN FUNDING',
         sourceStatus: c.source_status,
         currency: c.currency,
         goalAmount: c.goal_amount === null ? null : Number(c.goal_amount),

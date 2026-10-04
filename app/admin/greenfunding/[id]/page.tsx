@@ -8,7 +8,7 @@ import { ActionButton } from '@/components/admin/action-button'
 import { Button } from '@/components/ui/button'
 import { requireAdmin } from '@/lib/auth'
 import {
-  applyLatestAiTranslation, approveAndPublish, archiveImport, dismissUpdate, rejectImport, reopenImport, retranslate,
+  applyLatestAiTranslation, approveAndPublish, archiveImport, deleteImport, dismissUpdate, rejectImport, reopenImport, republishImport, resyncImport, retranslate,
 } from '@/lib/actions/greenfunding'
 import { greenFundingConfig } from '@/lib/greenfunding/config'
 import { productImageUrl } from '@/lib/images'
@@ -56,7 +56,7 @@ export default async function ReviewImportPage({ params }: PageProps<'/admin/gre
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="eyebrow"><Link href="/admin/greenfunding" className="hover:text-foreground">GREEN FUNDING</Link> · #{meta.source_campaign_id}</p>
+          <p className="eyebrow"><Link href="/admin/greenfunding" className="hover:text-foreground">{meta.source_name ?? meta.source}</Link> · #{meta.source_campaign_id}{meta.summary_word_count ? ` · English summary ${meta.summary_word_count} words` : ''}</p>
           <h1 className="mt-1 font-display text-2xl font-bold sm:text-3xl">{translated ? product.name : meta.ja_title}</h1>
           <div className="mt-2 flex flex-wrap gap-1.5">
             <PipelinePill status={meta.pipeline_status} />
@@ -80,6 +80,8 @@ export default async function ReviewImportPage({ params }: PageProps<'/admin/gre
           )}
           {['rejected', 'archived'].includes(meta.pipeline_status) ? (
             <ActionButton action={reopenImport.bind(null, product.id)}>Move back to review</ActionButton>
+          ) : ['failed', 'duplicate'].includes(meta.pipeline_status) ? (
+            <ActionButton action={republishImport.bind(null, product.id)} confirm={{ title: 'Publish this product?', description: meta.pipeline_status === 'duplicate' ? 'It was held as a possible duplicate. Publish only if it is a different campaign.' : 'It failed an automatic check. Publish only if you have fixed the problem.', confirmLabel: 'Publish' }}>Republish</ActionButton>
           ) : product.status === 'published' ? (
             <ActionButton action={archiveImport.bind(null, product.id)} variant="ghost" confirm={{ title: 'Unpublish and archive?', confirmLabel: 'Archive' }}>Unpublish</ActionButton>
           ) : (
@@ -155,12 +157,16 @@ export default async function ReviewImportPage({ params }: PageProps<'/admin/gre
       <section className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-sans text-lg font-semibold tracking-normal">Content</h2>
-          <ActionButton action={retranslate.bind(null, product.id)} size="sm" variant="ghost" confirm={{ title: 'Generate a new AI translation?', description: 'Uses one AI request per language. Your current text stays until you apply the new version.', confirmLabel: 'Queue translation' }}>Re-translate</ActionButton>
+          <div className="flex flex-wrap gap-1">
+            <ActionButton action={resyncImport.bind(null, product.id)} size="sm" variant="ghost">Re-sync from source</ActionButton>
+            <ActionButton action={retranslate.bind(null, product.id)} size="sm" variant="ghost" confirm={{ title: 'Re-run the AI?', description: 'Writes a new English summary and Traditional Chinese translation. Published or edited text stays until you apply the new version.', confirmLabel: 'Re-run AI' }}>Re-run AI</ActionButton>
+            <ActionButton action={deleteImport.bind(null, product.id)} size="sm" variant="ghost" confirm={{ title: 'Delete this product?', description: 'It is removed from the site and will not be imported again.', confirmLabel: 'Delete' }}>Delete</ActionButton>
+          </div>
         </div>
         <TranslationEditor
           key={JSON.stringify([product.name, zh?.name, meta.source_content_hash, meta.ja_summary])}
           productId={product.id}
-          source={{ title: meta.ja_title, short_description: meta.ja_short_description, description: meta.ja_description, summary: meta.ja_summary, summaryEdited: meta.ja_summary_edited }}
+          source={{ title: meta.ja_title, short_description: meta.ja_short_description, description: meta.ja_description, summary: meta.ja_summary, summaryEdited: meta.ja_summary_edited, language: meta.source_language }}
           en={translated ? texts(product) : texts(null)}
           zh={texts(zh as never)}
         />

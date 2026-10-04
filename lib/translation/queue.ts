@@ -7,6 +7,8 @@ import { greenFundingConfig } from '@/lib/greenfunding/config'
 import { autoPublishIfEnabled } from '@/lib/greenfunding/publish'
 import { translationSource } from '@/lib/greenfunding/content'
 import { createTranslator, translationConfig } from './index'
+import { createAIProvider } from '@/lib/ai'
+import { processAiJob } from '@/lib/ai/pipeline'
 import { TranslationError, type TargetLanguage, type TranslationOutput, type TranslationProvider } from './types'
 
 type Db = NonNullable<ReturnType<typeof createServiceClient>>
@@ -157,9 +159,11 @@ export async function processTranslationJob(
 export async function translateProductNow(productId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const db = createServiceClient()
   if (!db) return { ok: false, error: 'SUPABASE_SERVICE_ROLE_KEY is not configured.' }
-  const translator = createTranslator()
-  if (!translator) return { ok: false, error: 'TRANSLATION_API_KEY is not set.' }
-  const { data: meta } = await db.from('product_source_metadata').select('source_content_hash').eq('product_id', productId).maybeSingle()
+  const ai = createAIProvider()
+  const translator = ai ? null : createTranslator()
+  if (!ai && !translator) return { ok: false, error: 'Neither AI_API_KEY nor TRANSLATION_API_KEY is set.' }
+  const { data: meta } = await db.from('product_source_metadata').select('source_content_hash, source_language').eq('product_id', productId).maybeSingle()
+  if (!ai && meta?.source_language !== 'ja') return { ok: false, error: 'This source needs an AI provider (AI_PROVIDER and AI_API_KEY).' }
   if (!meta?.source_content_hash) return { ok: false, error: 'Unknown import.' }
   const { data: job } = await db
     .from('translation_jobs')
@@ -170,42 +174,55 @@ export async function translateProductNow(productId: string): Promise<{ ok: true
     .select('id, product_id, source_content_hash, attempts, max_attempts')
     .single()
   if (!job) return { ok: false, error: 'Could not queue the translation.' }
-  const outcome = await processTranslationJob(db, translator, job, { forceApply: true })
+  const outcome = ai ? await processAiJob(db, ai, job, { forceApply: true }) : await processTranslationJob(db, translator!, job, { forceApply: true })
   if (outcome === 'succeeded') return { ok: true }
+  if (outcome === 'not_eligible') return { ok: false, error: 'The AI found this is not a Tech & Innovation product; it was removed.' }
   const { data: after } = await db.from('translation_jobs').select('last_error').eq('id', job.id).single()
   return { ok: false, error: after?.last_error ?? `Translation ${outcome}.` }
 }
 
-// Processes a few queued jobs (each makes two translation requests).
+// Processes a few queued jobs. With an AI provider configured (AI_PROVIDER),
+// every source goes through the AI pipeline (English summary → Traditional
+// Chinese). Without one, Japanese sources use machine translation of their
+// summary and English sources wait.
 export async function processTranslationQueue(limit = translationConfig().jobsPerRun, translatorOverride?: TranslationProvider): Promise<QueueResult> {
   const result: QueueResult = { processed: 0, succeeded: 0, failed: 0, retried: 0 }
   const db = createServiceClient()
   if (!db) return { ...result, note: 'SUPABASE_SERVICE_ROLE_KEY is not configured.' }
-  const translator = translatorOverride ?? createTranslator()
-  if (!translator) return { ...result, note: 'TRANSLATION_API_KEY is not set; translations are waiting in the queue.' }
+  const ai = translatorOverride ? null : createAIProvider()
+  const translator = ai ? null : translatorOverride ?? createTranslator()
+  if (!ai && !translator) return { ...result, note: 'No AI_API_KEY or TRANSLATION_API_KEY is set; jobs are waiting in the queue.' }
 
   // Jobs stuck in "running" (e.g. a timed-out function) go back to the queue.
   await db.from('translation_jobs').update({ status: 'queued' }).eq('status', 'running').lt('started_at', new Date(Date.now() - 15 * 60_000).toISOString())
 
   const { data: jobs } = await db
     .from('translation_jobs')
-    .select('id, product_id, source_content_hash, attempts, max_attempts')
+    .select('id, product_id, source_content_hash, attempts, max_attempts, product:products ( source:product_source_metadata ( source_language ) )')
     .eq('status', 'queued')
     .lte('run_after', new Date().toISOString())
     .order('created_at')
-    .limit(limit)
+    .limit(limit * 3)
+  let handled = 0
   for (const job of jobs ?? []) {
+    if (handled >= limit) break
+    const meta = (job.product as { source?: { source_language?: string }[] | { source_language?: string } | null } | null)?.source
+    const language = (Array.isArray(meta) ? meta[0]?.source_language : meta?.source_language) ?? 'ja'
+    // English sources need the AI (machine translation can't write the summary).
+    if (!ai && language !== 'ja') continue
     const { data: claimed } = await db.from('translation_jobs').update({ status: 'running', started_at: new Date().toISOString() }).eq('id', job.id).eq('status', 'queued').select('id')
     if (!claimed?.length) continue
+    handled++
     result.processed++
-    const outcome = await processTranslationJob(db, translator, job)
+    const plainJob = { id: job.id, product_id: job.product_id, source_content_hash: job.source_content_hash, attempts: job.attempts, max_attempts: job.max_attempts }
+    const outcome = ai ? await processAiJob(db, ai, plainJob) : await processTranslationJob(db, translator!, plainJob)
     if (outcome === 'succeeded') result.succeeded++
     else if (outcome === 'retry') result.retried++
     else if (outcome === 'quota') {
       // The limit applies to every job: stop for now.
       result.waiting = (result.waiting ?? 0) + 1
       break
-    } else result.failed++
+    } else if (outcome !== 'not_eligible') result.failed++
   }
   return result
 }

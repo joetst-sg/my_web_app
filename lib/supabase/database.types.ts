@@ -1210,10 +1210,13 @@ export type Database = {
           source_campaign_id: string
           source_categories: string[]
           source_content_hash: string | null
+          source_language: string
           source_last_updated_at: string | null
+          source_name: string | null
           source_status: string
           source_tags: string[]
           source_url: string
+          summary_word_count: number | null
           translated_content_hash: string | null
           update_available: boolean
           updated_at: string
@@ -1251,10 +1254,13 @@ export type Database = {
           source_campaign_id: string
           source_categories?: string[]
           source_content_hash?: string | null
+          source_language?: string
           source_last_updated_at?: string | null
+          source_name?: string | null
           source_status?: string
           source_tags?: string[]
           source_url: string
+          summary_word_count?: number | null
           translated_content_hash?: string | null
           update_available?: boolean
           updated_at?: string
@@ -1292,10 +1298,13 @@ export type Database = {
           source_campaign_id?: string
           source_categories?: string[]
           source_content_hash?: string | null
+          source_language?: string
           source_last_updated_at?: string | null
+          source_name?: string | null
           source_status?: string
           source_tags?: string[]
           source_url?: string
+          summary_word_count?: number | null
           translated_content_hash?: string | null
           update_available?: boolean
           updated_at?: string
@@ -2165,6 +2174,13 @@ export type Database = {
             foreignKeyName: "sync_logs_run_id_fkey"
             columns: ["run_id"]
             isOneToOne: false
+            referencedRelation: "import_logs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_logs_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
             referencedRelation: "sync_runs"
             referencedColumns: ["id"]
           },
@@ -2434,6 +2450,60 @@ export type Database = {
         }
         Relationships: []
       }
+      import_logs: {
+        Row: {
+          completed_at: string | null
+          error_message: string | null
+          execution_seconds: number | null
+          id: string | null
+          items_failed: number | null
+          items_found: number | null
+          items_new: number | null
+          items_skipped: number | null
+          items_updated: number | null
+          metadata: Json | null
+          mode: string | null
+          source: string | null
+          started_at: string | null
+          status: string | null
+          trigger: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          error_message?: string | null
+          execution_seconds?: never
+          id?: string | null
+          items_failed?: number | null
+          items_found?: number | null
+          items_new?: number | null
+          items_skipped?: number | null
+          items_updated?: number | null
+          metadata?: never
+          mode?: string | null
+          source?: string | null
+          started_at?: string | null
+          status?: string | null
+          trigger?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          error_message?: string | null
+          execution_seconds?: never
+          id?: string | null
+          items_failed?: number | null
+          items_found?: number | null
+          items_new?: number | null
+          items_skipped?: number | null
+          items_updated?: number | null
+          metadata?: never
+          mode?: string | null
+          source?: string | null
+          started_at?: string | null
+          status?: string | null
+          trigger?: string | null
+        }
+        Relationships: []
+      }
       product_cards: {
         Row: {
           availability:
@@ -2471,6 +2541,7 @@ export type Database = {
           seller_id: string | null
           share_count: number | null
           slug: string | null
+          source_name: string | null
           status: Database["public"]["Enums"]["product_status"] | null
           tagline: string | null
           trending_rank: number | null
@@ -2538,6 +2609,7 @@ export type Database = {
           last_synced_at: string
           raised_amount: number
           source: string
+          source_name: string
           source_status: string
           source_url: string
         }[]
@@ -2560,6 +2632,16 @@ export type Database = {
           _user_id: string
         }
         Returns: undefined
+      }
+      crowdfunding_duplicate_candidates: {
+        Args: { _product_id: string }
+        Returns: {
+          name: string
+          product_id: string
+          reason: string
+          similarity: number
+          slug: string
+        }[]
       }
       enqueue_email: {
         Args: { _payload?: Json; _template: string; _user_id: string }
@@ -2612,6 +2694,7 @@ export type Database = {
         }[]
       }
       process_due_reminders: { Args: never; Returns: number }
+      product_source_name: { Args: { _product_id: string }; Returns: string }
       product_status_for: {
         Args: { _s: Database["public"]["Enums"]["submission_status"] }
         Returns: Database["public"]["Enums"]["product_status"]

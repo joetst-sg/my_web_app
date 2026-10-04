@@ -46,3 +46,35 @@ export function campaignUrlFromHref(href: string, baseUrl: string): string | nul
   if (!CAMPAIGN_PATH.test(url.pathname)) return null
   return `${url.origin}${url.pathname.replace(/\/$/, '')}`
 }
+
+// Canonical form of a campaign URL used for storage, duplicate checks and
+// Buy Now: https, lower-case host, no query string (UTM/tracking), no
+// fragment, no trailing slash. Returns null for anything that isn't https.
+export function normalizeCampaignUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  let url: URL
+  try {
+    url = new URL(raw.trim())
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'https:' || url.username || url.password || url.port) return null
+  const path = url.pathname.replace(/\/+$/, '') || ''
+  return `https://${url.hostname.toLowerCase()}${path}`
+}
+
+// Campaign page paths per source.
+export const CAMPAIGN_PATHS = {
+  greenfunding: /^\/[a-z0-9_-]{1,60}\/projects\/\d{1,10}$/i,
+  indiegogo: /^\/projects\/[a-z0-9_-]{1,120}(\/[a-z0-9_-]{1,200})?$/i,
+} as const
+
+export function validateSourceUrl(raw: string | null | undefined, allowedDomains: string[], path: RegExp): { ok: true; url: string } | { ok: false; reason: string } {
+  const normalized = normalizeCampaignUrl(raw)
+  if (!normalized) return { ok: false, reason: 'Campaign URL is missing or not a valid HTTPS URL.' }
+  const url = new URL(normalized)
+  if (url.port) return { ok: false, reason: 'Campaign URL must not use a custom port.' }
+  if (!hostAllowed(url.hostname, allowedDomains)) return { ok: false, reason: `Campaign URL must be on ${allowedDomains.join(' or ')}.` }
+  if (!path.test(url.pathname)) return { ok: false, reason: 'Campaign URL is not a campaign page.' }
+  return { ok: true, url: normalized }
+}

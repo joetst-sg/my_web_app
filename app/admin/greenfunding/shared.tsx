@@ -10,6 +10,8 @@ export const pipelineTone: Record<string, 'neutral' | 'info' | 'success' | 'warn
   rejected: 'neutral',
   archived: 'neutral',
   sync_error: 'danger',
+  failed: 'danger',
+  duplicate: 'warning',
   not_eligible: 'neutral',
 }
 
@@ -23,6 +25,8 @@ export const pipelineLabel: Record<string, string> = {
   rejected: 'Rejected',
   archived: 'Archived',
   sync_error: 'Sync error',
+  failed: 'Failed',
+  duplicate: 'Possible duplicate',
   not_eligible: 'Not eligible',
 }
 

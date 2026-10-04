@@ -5,7 +5,8 @@ import { z } from 'zod'
 import { getViewer } from '@/lib/auth'
 import type { ActionResult } from '@/lib/errors'
 import { greenFundingConfig } from '@/lib/greenfunding/config'
-import { backfillCategories, backfillSummaries, runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
+import { backfillCategories, backfillSummaries, resyncOne, runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
+import { createAIProvider, aiConfig } from '@/lib/ai'
 import { sourceContentHash, translationSource } from '@/lib/greenfunding/content'
 import { campaignIdFromUrl, validateCampaignUrl } from '@/lib/greenfunding/url'
 import { publishImport } from '@/lib/greenfunding/publish'
@@ -283,4 +284,64 @@ export async function resetSummary(productId: string): Promise<ActionResult> {
   await a.db.from('product_source_metadata').update({ ja_summary: source.summary ?? '', ja_summary_edited: false, source_content_hash: sourceContentHash(source) }).eq('id', meta.id)
   refresh()
   return { ok: true, message: 'Automatic summary restored. Click “Save & translate” to translate it.' }
+}
+
+// --- Maintenance controls (normal imports never need these) ---------------
+
+export async function resyncImport(productId: string): Promise<ActionResult> {
+  const a = await admin()
+  if (!a.ok) return a
+  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const res = await resyncOne(a.db, productId)
+  refresh()
+  if (!res.ok) return res
+  return { ok: true, message: res.outcome === 'updated' ? 'Re-synced: changes found and saved.' : 'Re-synced: no changes on the source.' }
+}
+
+// Removes the product. The campaign stays in the registry as archived, so
+// the importer never brings it back.
+export async function deleteImport(productId: string): Promise<ActionResult> {
+  const a = await admin()
+  if (!a.ok) return a
+  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { db, viewer } = a
+  const { meta, product } = await loadImport(db, productId)
+  if (!meta || !product) return { ok: false, error: 'This is not an imported product.' }
+  await db.from('product_source_metadata').update({ pipeline_status: 'archived', last_error: `Deleted by ${viewer.email}` }).eq('id', meta.id)
+  const { error } = await db.from('products').delete().eq('id', productId)
+  if (error) return { ok: false, error: error.message }
+  await logSync(db, { source: meta.source, operation: 'archive', status: 'success', campaignId: meta.source_campaign_id, campaignUrl: meta.source_url, message: `Product deleted by ${viewer.email}; it will not be re-imported` })
+  await audit(db, viewer.id, 'greenfunding.delete', productId, { campaign_id: meta.source_campaign_id })
+  refresh(product.slug)
+  return { ok: true, message: 'Deleted. It will not be imported again.' }
+}
+
+// Puts an unpublished, failed or held (possible duplicate) product live again.
+export async function republishImport(productId: string): Promise<ActionResult> {
+  const a = await admin()
+  if (!a.ok) return a
+  if (!uuid.safeParse(productId).success) return { ok: false, error: 'Unknown product.' }
+  const { db, viewer } = a
+  const { data: current } = await db.from('products').select('status').eq('id', productId).maybeSingle()
+  if (!current) return { ok: false, error: 'Unknown product.' }
+  if (current.status !== 'published') await db.from('products').update({ status: 'pending_review', published_at: null }).eq('id', productId)
+  const res = await publishImport(db, productId, { kind: 'admin', id: viewer.id, email: viewer.email })
+  if (!res.ok) return res
+  refresh(res.slug)
+  return { ok: true, message: 'Published.' }
+}
+
+// Confirms the AI key and model work (one tiny request).
+export async function checkAi(): Promise<ActionResult> {
+  const a = await admin()
+  if (!a.ok) return a
+  const ai = createAIProvider()
+  const c = aiConfig()
+  if (!ai) return { ok: false, error: 'AI is not configured: set AI_PROVIDER=gemini and AI_API_KEY in Vercel.' }
+  try {
+    const tags = await ai.generateTags({ title: 'Test portable speaker', description: 'A small portable Bluetooth speaker with a rechargeable battery.' })
+    return { ok: true, message: `${c.provider} · ${c.model} works (sample tags: ${tags.join(', ') || 'none'}).` }
+  } catch (e) {
+    return { ok: false, error: `AI check failed: ${e instanceof Error ? e.message : String(e)}` }
+  }
 }

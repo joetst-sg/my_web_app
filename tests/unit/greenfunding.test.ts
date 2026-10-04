@@ -626,7 +626,7 @@ describe('machine translation spacing clean-up', () => {
 
 describe('publishing rules', () => {
   beforeEach(() => vi.resetModules())
-  const db = (meta: Record<string, unknown>, product: Record<string, unknown>, cats: unknown[] = []) => {
+  const db = (meta: Record<string, unknown>, product: Record<string, unknown>, cats: unknown[] = [], images = 1) => {
     const updates: string[] = []
     const table = (name: string) => {
       const q: Record<string, unknown> = {}
@@ -635,13 +635,13 @@ describe('publishing rules', () => {
         select: chain, eq: chain, insert: async () => ({ error: null }),
         update: () => { updates.push(name); return { eq: async () => ({ error: null }) } },
         maybeSingle: async () => ({ data: name === 'products' ? product : meta }),
-        then: (r: (v: unknown) => void) => r({ data: cats }),
+        then: (r: (v: unknown) => void) => r({ data: cats, count: name === 'product_images' ? images : cats.length }),
       })
       return q
     }
     return { db: { from: table } as never, updates }
   }
-  const meta = { id: 'm', source_url: 'https://greenfunding.jp/lab/projects/1', source_campaign_id: '1', source_status: 'active', translated_content_hash: 'h' }
+  const meta = { id: 'm', source: 'greenfunding', source_url: 'https://greenfunding.jp/lab/projects/1', source_campaign_id: '1', source_status: 'active', translated_content_hash: 'h' }
   const product = { id: 'p', slug: 's', name: 'Name', status: 'pending_review', external_url: 'https://greenfunding.jp/lab/projects/1', brand_id: null, translations: { 'zh-HK': { name: '名稱' } } }
 
   it('never publishes in test mode', async () => {
@@ -665,6 +665,8 @@ describe('publishing rules', () => {
     expect((await publishImport(db(meta, { ...product, translations: {} }).db, 'p', { kind: 'auto' })).ok).toBe(false)
     expect((await publishImport(db({ ...meta, source_status: 'ended' }, product).db, 'p', { kind: 'auto' })).ok).toBe(false)
     expect((await publishImport(db({ ...meta, source_url: 'https://evil.example/lab/projects/1' }, { ...product, external_url: 'https://evil.example/lab/projects/1' }).db, 'p', { kind: 'auto' })).ok).toBe(false)
+    // A product without any image is never published.
+    expect(await publishImport(db(meta, product, [], 0).db, 'p', { kind: 'auto' })).toMatchObject({ ok: false, error: 'The product has no image.' })
     vi.unstubAllEnvs()
   })
   it('does nothing when auto-publish is off', async () => {

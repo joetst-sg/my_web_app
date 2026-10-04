@@ -3,13 +3,13 @@ import { randomUUID } from 'node:crypto'
 import { slugify } from '@/lib/format'
 import { createServiceClient } from '@/lib/supabase/server'
 import { greenFundingConfig, type GreenFundingConfig } from './config'
-import { changedFields, eligibility, needsTranslationReview, sourceContentHash, translationSource } from './content'
+import { changedFields, eligibility, needsTranslationReview, sourceContentHash, translationSource, type TranslationSource } from './content'
 import { actionForListedCampaign, shouldCheckForUpdates, syncIsDue } from './decide'
 import { IMAGE_BUCKET, importImages } from './images'
 import { chooseCategory, type CategoryMapping } from './mapping'
-import { createCampaignSource } from './sources'
+import { sourceDefinition, sourceDefinitions, type SourceDefinition, type SourceKey } from './sources'
 import { RequestBudgetExceeded, SourceError, type CampaignSource, type SourceCampaign } from './types'
-import { hostAllowed, validateCampaignUrl } from './url'
+import { hostAllowed, validateSourceUrl } from './url'
 
 type Db = NonNullable<ReturnType<typeof createServiceClient>>
 type Registry = {
@@ -32,6 +32,8 @@ type Registry = {
 
 export type SyncResult = {
   ran: boolean
+  source?: string
+  sources?: Record<string, SyncResult>
   reason?: string
   runId?: string
   mode?: string
@@ -43,17 +45,16 @@ export type SyncResult = {
   requests: number
 }
 
-const SOURCE = 'greenfunding'
 const REGISTRY_COLUMNS =
   'id, product_id, pipeline_status, source_status, source_campaign_id, source_url, ja_title, ja_short_description, ja_description, campaign_ends_at, source_categories, changed_fields, translated_content_hash, ja_summary, ja_summary_edited'
 
 export async function logSync(
   db: Db,
-  entry: { runId?: string | null; operation: string; status: 'success' | 'warning' | 'error'; campaignId?: string | null; campaignUrl?: string | null; productId?: string | null; message?: string | null; error?: string | null; durationMs?: number | null },
+  entry: { source?: string; runId?: string | null; operation: string; status: 'success' | 'warning' | 'error'; campaignId?: string | null; campaignUrl?: string | null; productId?: string | null; message?: string | null; error?: string | null; durationMs?: number | null },
 ) {
   await db.from('sync_logs').insert({
-    run_id: entry.runId ?? null,
-    source: SOURCE,
+    run_id: entry.runId || null,
+    source: entry.source ?? 'greenfunding',
     operation: entry.operation,
     status: entry.status,
     campaign_id: entry.campaignId ?? null,
@@ -81,10 +82,10 @@ async function findOrCreateBrand(db: Db, name: string | null): Promise<string | 
   return null
 }
 
-async function rememberSourceCategories(db: Db, labels: string[]) {
+async function rememberSourceCategories(db: Db, source: string, labels: string[]) {
   if (!labels.length) return
   await db.from('category_mappings').upsert(
-    labels.map((source_category) => ({ source: SOURCE, source_category, category_id: null })),
+    labels.map((source_category) => ({ source, source_category, category_id: null })),
     { onConflict: 'source,source_category', ignoreDuplicates: true },
   )
 }
@@ -110,7 +111,7 @@ function imageAllowed(u: string, config: GreenFundingConfig) {
   }
 }
 
-async function importCampaignImages(db: Db, config: GreenFundingConfig, productId: string, campaign: SourceCampaign) {
+export async function importCampaignImages(db: Db, config: GreenFundingConfig, productId: string, campaign: Pick<SourceCampaign, 'campaignId' | 'imageUrls'>) {
   const allowed = campaign.imageUrls.filter((u) => imageAllowed(u, config))
   const [{ data: rows }, { data: meta }] = await Promise.all([
     db.from('product_images').select('original_url, position').eq('product_id', productId),
@@ -157,23 +158,43 @@ async function queueTranslation(db: Db, productId: string, hash: string) {
   )
 }
 
+// Slug used until the English title is known.
+export function placeholderSlug(source: string, campaignId: string) {
+  const prefix = source === 'greenfunding' ? 'gf' : source === 'indiegogo' ? 'igg' : slugify(source).slice(0, 10) || 'src'
+  return `${prefix}-${slugify(campaignId).slice(0, 70) || 'campaign'}`
+}
+
+// What the content step works from: Japanese sources use the cleaned
+// Japanese summary; English sources use their own (short) text.
+export function contentSourceFor(def: Pick<SourceDefinition, 'language' | 'config'>, c: { title: string | null; shortDescription: string | null; description: string | null }, editedSummary?: string | null): TranslationSource {
+  if (def.language === 'ja') return translationSource(c, def.config.summaryChars, editedSummary)
+  return { title: c.title, shortDescription: c.shortDescription, summary: editedSummary ?? c.description }
+}
+
 // Imports one new campaign. Either a complete draft product is created, or
 // nothing is (the registry row records the error and the next run retries).
 type Taxonomy = { mappings: CategoryMapping[]; slugToId: Map<string, string> }
 
-async function loadTaxonomy(db: Db): Promise<Taxonomy> {
+export async function loadTaxonomy(db: Db, source: string): Promise<Taxonomy> {
   const [{ data: mappingRows }, { data: cats }] = await Promise.all([
-    db.from('category_mappings').select('source_category, category_id, priority').eq('source', SOURCE),
+    db.from('category_mappings').select('source_category, category_id, priority').eq('source', source),
     db.from('categories').select('id, slug'),
   ])
   return { mappings: (mappingRows ?? []) as CategoryMapping[], slugToId: new Map((cats ?? []).map((c) => [c.slug, c.id])) }
 }
 
-async function importCampaign(db: Db, config: GreenFundingConfig, runId: string, campaign: SourceCampaign, taxonomy: Taxonomy) {
+async function importCampaign(db: Db, def: SourceDefinition, runId: string, input: SourceCampaign, taxonomy: Taxonomy) {
+  const config = def.config
   const started = Date.now()
-  const base = { runId, campaignId: campaign.campaignId, campaignUrl: campaign.url }
+  // Stored and used for Buy Now in canonical form (no tracking parameters).
+  const urlCheck = validateSourceUrl(input.url, config.allowedDomains, def.campaignPath)
+  const campaign = { ...input, url: urlCheck.ok ? urlCheck.url : input.url }
+  const base = { source: def.key, runId, campaignId: campaign.campaignId, campaignUrl: campaign.url }
+  const content = contentSourceFor(def, campaign)
   const registryFields = {
-    source: SOURCE,
+    source: def.key,
+    source_name: def.displayName,
+    source_language: def.language,
     source_url: campaign.url,
     source_campaign_id: campaign.campaignId,
     source_status: campaign.status,
@@ -181,7 +202,7 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
     ja_title: campaign.title,
     ja_short_description: campaign.shortDescription,
     ja_description: campaign.description,
-    ja_summary: translationSource(campaign, config.summaryChars).summary,
+    ja_summary: def.language === 'ja' ? content.summary : null,
     owner_name: campaign.ownerName,
     source_categories: campaign.categories,
     source_tags: campaign.tags,
@@ -194,11 +215,10 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
     campaign_starts_at: campaign.startsAt,
     campaign_ends_at: campaign.endsAt,
     campaign_ends_at_estimated: campaign.endsAtEstimated,
-    raw_metadata: campaign.raw as never,
+    raw_metadata: { ...campaign.raw, imageUrls: campaign.imageUrls } as never,
     last_synced_at: new Date().toISOString(),
   }
 
-  const urlCheck = validateCampaignUrl(campaign.url, config.allowedDomains)
   const eligible = eligibility(campaign, config.excludedCategories)
   if (!urlCheck.ok || !eligible.eligible) {
     const reason = !urlCheck.ok ? urlCheck.reason : (eligible as { reason: string }).reason
@@ -219,19 +239,18 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
 
   let productId: string | null = null
   try {
-    const hash = sourceContentHash(translationSource(campaign, config.summaryChars))
+    const hash = sourceContentHash(content)
     const brandId = await findOrCreateBrand(db, campaign.ownerName)
-    await rememberSourceCategories(db, campaign.categories)
-    const categoryId = chooseCategory(
-      { sourceCategories: campaign.categories, title: campaign.title, summary: translationSource(campaign, config.summaryChars).summary },
-      taxonomy.mappings,
-      taxonomy.slugToId,
-    )
+    await rememberSourceCategories(db, def.key, campaign.categories)
+    // Sources without categories (Indiegogo) are categorized by the AI step.
+    const categoryId = campaign.categories.length
+      ? chooseCategory({ sourceCategories: campaign.categories, title: campaign.title, summary: content.summary }, taxonomy.mappings, taxonomy.slugToId)
+      : null
 
     const { data: product, error: productError } = await db
       .from('products')
       .insert({
-        slug: `gf-${campaign.campaignId}`,
+        slug: placeholderSlug(def.key, campaign.campaignId),
         // Placeholders until translated (the full Japanese text stays in the registry).
         name: clip(campaign.title!, 120),
         tagline: campaign.shortDescription ? clip(campaign.shortDescription, 200) : null,
@@ -239,7 +258,7 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
         brand_id: brandId,
         seller_id: null,
         external_url: campaign.url,
-        currency: campaign.currency ?? 'JPY',
+        currency: campaign.currency ?? (def.key === 'greenfunding' ? 'JPY' : 'USD'),
         price: campaign.price,
         availability: 'crowdfunding',
         status: 'draft',
@@ -255,15 +274,18 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
       await db.from('product_videos').insert(videos.map((url, position) => ({ product_id: productId!, url, provider: /vimeo/.test(url) ? 'vimeo' : 'youtube', position })))
     }
 
-    const images = await importCampaignImages(db, config, productId, campaign)
-    await logSync(db, {
-      ...base,
-      productId,
-      operation: 'image_import',
-      status: images.errors.length ? (images.imported ? 'warning' : 'error') : 'success',
-      message: `${images.imported} image(s) imported`,
-      error: images.errors.join('\n') || null,
-    })
+    // Some sources copy images only after the AI step has accepted the campaign.
+    if (!def.deferImages) {
+      const images = await importCampaignImages(db, config, productId, campaign)
+      await logSync(db, {
+        ...base,
+        productId,
+        operation: 'image_import',
+        status: images.errors.length ? (images.imported ? 'warning' : 'error') : 'success',
+        message: `${images.imported} image(s) imported`,
+        error: images.errors.join('\n') || null,
+      })
+    }
 
     await db
       .from('product_source_metadata')
@@ -283,7 +305,10 @@ async function importCampaign(db: Db, config: GreenFundingConfig, runId: string,
 // Re-checks an imported campaign. Source data is refreshed; translations are
 // never overwritten here — changed text queues a new translation job and
 // flags the product as "update available".
-async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string, row: Registry, campaign: SourceCampaign) {
+async function updateCampaign(db: Db, def: SourceDefinition, runId: string, row: Registry, input: SourceCampaign) {
+  const config = def.config
+  const urlCheck = validateSourceUrl(input.url, config.allowedDomains, def.campaignPath)
+  const campaign = { ...input, url: urlCheck.ok ? urlCheck.url : row.source_url }
   const started = Date.now()
   const productId = row.product_id!
   const { data: images } = await db.from('product_images').select('original_url').eq('product_id', productId)
@@ -311,7 +336,7 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
     price: campaign.price,
     campaign_ends_at: campaign.endsAt,
     campaign_ends_at_estimated: campaign.endsAtEstimated,
-    raw_metadata: campaign.raw as never,
+    raw_metadata: { ...campaign.raw, imageUrls: campaign.imageUrls } as never,
     last_synced_at: new Date().toISOString(),
   }
   if (!changed.length) {
@@ -320,7 +345,7 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
   }
 
   // An administrator-edited summary is kept; otherwise it follows the source.
-  const source = translationSource(campaign, config.summaryChars, row.ja_summary_edited ? row.ja_summary : null)
+  const source = contentSourceFor(def, campaign, row.ja_summary_edited ? row.ja_summary : null)
   const hash = sourceContentHash(source)
   // New images are imported automatically and end dates are estimates: neither needs review.
   const significant = changed.filter((f) => f !== 'end_date' && f !== 'images')
@@ -331,7 +356,7 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
       ja_title: campaign.title,
       ja_short_description: campaign.shortDescription,
       ja_description: campaign.description,
-      ja_summary: source.summary,
+      ja_summary: def.language === 'ja' ? source.summary : null,
       source_status: campaign.status,
       source_categories: campaign.categories,
       source_content_hash: hash,
@@ -341,16 +366,17 @@ async function updateCampaign(db: Db, config: GreenFundingConfig, runId: string,
     })
     .eq('id', row.id)
 
-  if (changed.includes('categories')) await rememberSourceCategories(db, campaign.categories)
+  if (changed.includes('categories')) await rememberSourceCategories(db, def.key, campaign.categories)
   // Only text that is actually translated (title, short description, summary) costs a new translation.
   if (needsTranslationReview(changed) && hash !== row.translated_content_hash) await queueTranslation(db, productId, hash)
   let imageNote = ''
   if (changed.includes('images')) {
     const result = await importCampaignImages(db, config, productId, campaign)
     imageNote = `; ${result.imported} new image(s)`
-    if (result.errors.length) await logSync(db, { runId, operation: 'image_import', status: 'warning', campaignId: campaign.campaignId, campaignUrl: campaign.url, productId, error: result.errors.join('\n') })
+    if (result.errors.length) await logSync(db, { source: def.key, runId, operation: 'image_import', status: 'warning', campaignId: campaign.campaignId, campaignUrl: campaign.url, productId, error: result.errors.join('\n') })
   }
   await logSync(db, {
+    source: def.key,
     runId,
     operation: changed.includes('status') ? 'status_change' : 'update',
     status: changed.includes('status') && ['ended', 'cancelled'].includes(campaign.status) ? 'warning' : 'success',
@@ -369,7 +395,7 @@ export async function backfillSummaries(db: Db, config: GreenFundingConfig = gre
   const { data: rows } = await db
     .from('product_source_metadata')
     .select('id, product_id, ja_title, ja_short_description, ja_description, ja_summary, ja_summary_edited, source_content_hash, translated_content_hash, pipeline_status')
-    .eq('source', SOURCE)
+    .eq('source_language', 'ja')
     .not('product_id', 'is', null)
     .is('ja_summary', null)
     .limit(50)
@@ -391,15 +417,16 @@ export async function backfillSummaries(db: Db, config: GreenFundingConfig = gre
 export async function backfillCategories(db: Db) {
   const { data: rows } = await db
     .from('product_source_metadata')
-    .select('id, product_id, source_categories, ja_title, ja_summary')
-    .eq('source', SOURCE)
+    .select('id, source, product_id, source_categories, ja_title, ja_summary')
     .eq('needs_category_review', true)
     .not('product_id', 'is', null)
     .limit(50)
   if (!rows?.length) return { categorized: 0 }
-  const taxonomy = await loadTaxonomy(db)
+  const taxonomies = new Map<string, Taxonomy>()
   let categorized = 0
   for (const r of rows) {
+    if (!taxonomies.has(r.source)) taxonomies.set(r.source, await loadTaxonomy(db, r.source))
+    const taxonomy = taxonomies.get(r.source)!
     const { count } = await db.from('product_categories').select('product_id', { count: 'exact', head: true }).eq('product_id', r.product_id!)
     if ((count ?? 0) > 0) {
       await db.from('product_source_metadata').update({ needs_category_review: false }).eq('id', r.id)
@@ -416,45 +443,55 @@ export async function backfillCategories(db: Db) {
   return { categorized }
 }
 
-// One synchronisation run. `trigger: 'cron'` respects the configured
-// interval; `manual` (Sync Now) always runs.
-export async function runSync(trigger: 'cron' | 'manual', options: { source?: CampaignSource } = {}): Promise<SyncResult> {
-  const empty = { discovered: 0, newProducts: 0, updatedProducts: 0, skipped: 0, errors: 0, requests: 0 }
-  const db = createServiceClient()
-  if (!db) return { ran: false, reason: 'SUPABASE_SERVICE_ROLE_KEY is not configured.', ...empty }
-  const config = greenFundingConfig()
+// Tells administrators when a run goes badly (no approval is needed for
+// successful imports — this is monitoring only).
+async function alertAdmins(db: Db, title: string, body: string) {
+  const since = new Date(Date.now() - 6 * 3_600_000).toISOString()
+  const { data: recent } = await db.from('notifications').select('id').eq('type', 'system').eq('title', title).gt('created_at', since).limit(1)
+  if (recent?.length) return
+  const { data: admins } = await db.from('user_roles').select('user_id').eq('role', 'admin')
+  if (!admins?.length) return
+  await db.from('notifications').insert(admins.map((a) => ({ user_id: a.user_id, type: 'system' as const, title: title.slice(0, 160), body: body.slice(0, 1000), link: '/admin/greenfunding/logs' })))
+}
+
+// One synchronisation run of one source. `trigger: 'cron'` respects the
+// source's interval; `manual` (Sync Now) always runs.
+async function runSourceSync(db: Db, def: SourceDefinition, trigger: 'cron' | 'manual', override?: CampaignSource): Promise<SyncResult> {
+  const empty = { source: def.key, discovered: 0, newProducts: 0, updatedProducts: 0, skipped: 0, errors: 0, requests: 0 }
+  const config = def.config
 
   const { data: running } = await db
     .from('sync_runs')
     .select('id')
-    .eq('source', SOURCE)
+    .eq('source', def.key)
     .eq('status', 'running')
     .gt('started_at', new Date(Date.now() - 15 * 60_000).toISOString())
     .limit(1)
   if (running?.length) return { ran: false, reason: 'Another sync is still running.', ...empty }
 
   if (trigger === 'cron') {
-    const { data: last } = await db.from('sync_runs').select('started_at').eq('source', SOURCE).order('started_at', { ascending: false }).limit(1).maybeSingle()
+    const { data: last } = await db.from('sync_runs').select('started_at').eq('source', def.key).order('started_at', { ascending: false }).limit(1).maybeSingle()
     if (!syncIsDue(last?.started_at ?? null, config.syncIntervalMinutes)) return { ran: false, reason: 'Not due yet.', ...empty }
   }
 
-  const { data: run, error: runError } = await db.from('sync_runs').insert({ source: SOURCE, trigger, mode: config.mode }).select('id').single()
+  const { data: run, error: runError } = await db.from('sync_runs').insert({ source: def.key, trigger, mode: config.mode }).select('id').single()
   if (runError || !run) return { ran: false, reason: `Could not start a run: ${runError?.message}`, ...empty }
   const runId = run.id
   const result: SyncResult = { ran: true, runId, mode: config.mode, ...empty }
   let source: CampaignSource
   let stopReason: string | null = null
+  const log = (entry: Parameters<typeof logSync>[1]) => logSync(db, { source: def.key, runId, ...entry })
 
   try {
-    source = options.source ?? createCampaignSource(config)
-    const taxonomy = await loadTaxonomy(db)
+    source = override ?? def.create()
+    const taxonomy = await loadTaxonomy(db, def.key)
 
     // 1. New campaigns.
     const refs = await source.listNewCampaigns()
     result.discovered = refs.length
-    await logSync(db, { runId, operation: 'discover', status: 'success', message: `${refs.length} campaign(s) on the newest listing page(s)` })
+    await log({ operation: 'discover', status: 'success', message: `${refs.length} campaign(s) found on ${def.displayName}` })
     const { data: known } = refs.length
-      ? await db.from('product_source_metadata').select(REGISTRY_COLUMNS).eq('source', SOURCE).in('source_campaign_id', refs.map((r) => r.campaignId))
+      ? await db.from('product_source_metadata').select(REGISTRY_COLUMNS).eq('source', def.key).in('source_campaign_id', refs.map((r) => r.campaignId))
       : { data: [] as Registry[] }
     const byId = new Map(((known ?? []) as Registry[]).map((r) => [r.source_campaign_id, r]))
     const touched = new Set<string>()
@@ -464,11 +501,16 @@ export async function runSync(trigger: 'cron' | 'manual', options: { source?: Ca
         result.skipped++
         continue
       }
+      // Each new import needs AI processing: a few per run, the rest next time.
+      if (result.newProducts >= config.maxNewPerRun) {
+        result.skipped++
+        continue
+      }
       touched.add(ref.campaignId)
       const started = Date.now()
       try {
         const campaign = await source.fetchCampaign(ref)
-        const outcome = await importCampaign(db, config, runId, campaign, taxonomy)
+        const outcome = await importCampaign(db, def, runId, campaign, taxonomy)
         if (outcome === 'new') result.newProducts++
         else result.skipped++
       } catch (e) {
@@ -477,7 +519,7 @@ export async function runSync(trigger: 'cron' | 'manual', options: { source?: Ca
           break
         }
         result.errors++
-        await logSync(db, { runId, operation: 'import', status: 'error', campaignId: ref.campaignId, campaignUrl: ref.url, error: errorText(e), durationMs: Date.now() - started })
+        await log({ operation: 'import', status: 'error', campaignId: ref.campaignId, campaignUrl: ref.url, error: errorText(e), durationMs: Date.now() - started })
       }
     }
 
@@ -486,7 +528,7 @@ export async function runSync(trigger: 'cron' | 'manual', options: { source?: Ca
       const { data: rows } = await db
         .from('product_source_metadata')
         .select(REGISTRY_COLUMNS)
-        .eq('source', SOURCE)
+        .eq('source', def.key)
         .not('product_id', 'is', null)
         .order('last_synced_at', { ascending: true, nullsFirst: true })
         .limit(config.updateChecksPerRun + touched.size)
@@ -494,31 +536,31 @@ export async function runSync(trigger: 'cron' | 'manual', options: { source?: Ca
         const started = Date.now()
         try {
           const campaign = await source.fetchCampaign({ campaignId: row.source_campaign_id, url: row.source_url })
-          const outcome = await updateCampaign(db, config, runId, row, campaign)
+          const outcome = await updateCampaign(db, def, runId, row, campaign)
           if (outcome === 'updated') result.updatedProducts++
         } catch (e) {
           if (e instanceof RequestBudgetExceeded || (e instanceof SourceError && /stopping this run/.test(e.message))) {
             stopReason = e.message
             break
           }
-          // A campaign page that disappeared is a status change, not a crash.
+          // A campaign that disappeared is a status change, not a crash.
           if (e instanceof SourceError && !e.retryable) {
             await db.from('product_source_metadata').update({ source_status: 'ended', update_available: true, changed_fields: [...new Set([...(row.changed_fields ?? []), 'status'])], last_synced_at: new Date().toISOString(), last_error: e.message }).eq('id', row.id)
-            await logSync(db, { runId, operation: 'status_change', status: 'warning', campaignId: row.source_campaign_id, campaignUrl: row.source_url, productId: row.product_id, message: 'Campaign page is no longer available', error: e.message, durationMs: Date.now() - started })
+            await log({ operation: 'status_change', status: 'warning', campaignId: row.source_campaign_id, campaignUrl: row.source_url, productId: row.product_id, message: 'Campaign is no longer available', error: e.message, durationMs: Date.now() - started })
             continue
           }
           result.errors++
-          await logSync(db, { runId, operation: 'update', status: 'error', campaignId: row.source_campaign_id, campaignUrl: row.source_url, productId: row.product_id, error: errorText(e), durationMs: Date.now() - started })
+          await log({ operation: 'update', status: 'error', campaignId: row.source_campaign_id, campaignUrl: row.source_url, productId: row.product_id, error: errorText(e), durationMs: Date.now() - started })
         }
       }
     }
     result.requests = source.requestCount
   } catch (e) {
     result.errors++
-    await logSync(db, { runId, operation: 'sync', status: 'error', error: errorText(e) })
+    await log({ operation: 'sync', status: 'error', error: errorText(e) })
   }
 
-  if (stopReason) await logSync(db, { runId, operation: 'sync', status: 'warning', message: `Stopped early: ${stopReason}` })
+  if (stopReason) await log({ operation: 'sync', status: 'warning', message: `Stopped early: ${stopReason}` })
   const status = result.errors ? (result.newProducts || result.updatedProducts ? 'warning' : 'error') : stopReason ? 'warning' : 'success'
   await db
     .from('sync_runs')
@@ -534,5 +576,50 @@ export async function runSync(trigger: 'cron' | 'manual', options: { source?: Ca
       message: stopReason,
     })
     .eq('id', runId)
+  if (result.errors >= 5) await alertAdmins(db, `${def.displayName} import: ${result.errors} errors`, `The last ${def.displayName} sync had ${result.errors} errors. See the sync log for details.`)
   return result
 }
+
+// Runs every enabled source (or just one). Results are summed; per-source
+// details are in `sources`.
+export async function runSync(trigger: 'cron' | 'manual', options: { only?: SourceKey; source?: CampaignSource } = {}): Promise<SyncResult> {
+  const empty = { discovered: 0, newProducts: 0, updatedProducts: 0, skipped: 0, errors: 0, requests: 0 }
+  const db = createServiceClient()
+  if (!db) return { ran: false, reason: 'SUPABASE_SERVICE_ROLE_KEY is not configured.', ...empty }
+  const defs = sourceDefinitions().filter((d) => (options.only ? d.key === options.only : d.config.enabled))
+  if (!defs.length) return { ran: false, reason: 'No crowdfunding source is enabled.', ...empty }
+  const sources: Record<string, SyncResult> = {}
+  for (const def of defs) sources[def.key] = await runSourceSync(db, def, trigger, options.source)
+  const all = Object.values(sources)
+  const sum = (k: 'discovered' | 'newProducts' | 'updatedProducts' | 'skipped' | 'errors' | 'requests') => all.reduce((a, r) => a + r[k], 0)
+  return {
+    ran: all.some((r) => r.ran),
+    reason: all.every((r) => !r.ran) ? [...new Set(all.map((r) => r.reason))].join(' ') : undefined,
+    mode: defs[0].config.mode,
+    discovered: sum('discovered'),
+    newProducts: sum('newProducts'),
+    updatedProducts: sum('updatedProducts'),
+    skipped: sum('skipped'),
+    errors: sum('errors'),
+    requests: sum('requests'),
+    sources,
+  }
+}
+
+// Re-fetches one imported campaign from its source now (admin "Re-sync").
+export async function resyncOne(db: Db, productId: string): Promise<{ ok: true; outcome: string } | { ok: false; error: string }> {
+  const { data: row } = await db.from('product_source_metadata').select(REGISTRY_COLUMNS + ', source').eq('product_id', productId).maybeSingle()
+  if (!row) return { ok: false, error: 'Not an imported product.' }
+  const r = row as unknown as Registry & { source: string }
+  const def = sourceDefinition(r.source)
+  if (!def) return { ok: false, error: `Unknown source "${r.source}".` }
+  try {
+    const campaign = await def.create().fetchCampaign({ campaignId: r.source_campaign_id, url: r.source_url })
+    const outcome = await updateCampaign(db, def, '', r, campaign)
+    return { ok: true, outcome }
+  } catch (e) {
+    return { ok: false, error: errorText(e) }
+  }
+}
+
+export { sourceDefinition }

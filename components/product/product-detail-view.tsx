@@ -52,6 +52,7 @@ export type ProductView = {
   tags: { slug: string; name: string }[]
   // Set for products imported from a crowdfunding source (GREEN FUNDING).
   campaign?: {
+    sourceName: string
     sourceStatus: string
     currency: string | null
     goalAmount: number | null
@@ -126,19 +127,19 @@ export async function ProductDetailView({
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
-              {p.external_url && !unavailable && (p.campaign ? <BuyButton productId={p.id} label={t('product.gf.buy')} srLabel={t('product.gf.opens')} className="sm:min-w-64" /> : <BuyButton productId={p.id} />)}
+              {p.external_url && !unavailable && (p.campaign ? <BuyButton productId={p.id} label={t('product.gf.buy', { source: p.campaign.sourceName })} srLabel={t('product.gf.opens', { source: p.campaign.sourceName })} className="sm:min-w-64" /> : <BuyButton productId={p.id} />)}
               <SaveButton productId={p.id} productName={p.name} initialSaved={viewer?.saved} variant="full" />
               <AddToCollectionButton productId={p.id} productName={p.name} />
               <ReminderButton productId={p.id} productName={p.name} availability={p.availability} initialSet={viewer?.reminded} variant="full" />
               {shareUrl && <ShareButton url={shareUrl} title={p.name} productId={p.id} />}
             </div>
           )}
-          <p className="text-xs text-muted-foreground">{p.campaign ? t('product.gf.note') : t('product.buyNote')}</p>
+          <p className="text-xs text-muted-foreground">{p.campaign ? t('product.gf.note', { source: p.campaign.sourceName }) : t('product.buyNote')}</p>
 
           {p.campaign && (
             <section aria-labelledby="campaign" className="rounded-2xl border p-5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 id="campaign" className="font-sans text-base font-semibold tracking-normal">{t('product.gf.source')}</h2>
+                <h2 id="campaign" className="font-sans text-base font-semibold tracking-normal">{t('product.gf.source', { source: p.campaign.sourceName })}</h2>
                 <StatusPill tone={p.campaign.sourceStatus === 'ended' || p.campaign.sourceStatus === 'cancelled' ? 'danger' : 'success'}>
                   {p.campaign.sourceStatus === 'ended' ? t('product.gf.ended') : p.campaign.sourceStatus === 'cancelled' ? t('product.gf.cancelled') : p.campaign.sourceStatus === 'succeeded' ? t('product.gf.funded') : t('product.gf.live')}
                 </StatusPill>
@@ -151,7 +152,7 @@ export async function ProductDetailView({
               {p.campaign.daysRemaining !== null && !['ended', 'cancelled'].includes(p.campaign.sourceStatus) && (
                 <p className="mt-3 text-sm">{t('product.gf.daysLeft', { days: p.campaign.daysRemaining })}</p>
               )}
-              {p.campaign.lastSyncedAt && <p className="mt-2 text-xs text-muted-foreground">{t('product.gf.asOf', { date: f.date(p.campaign.lastSyncedAt) })}</p>}
+              {p.campaign.lastSyncedAt && <p className="mt-2 text-xs text-muted-foreground">{t('product.gf.asOf', { source: p.campaign.sourceName, date: f.date(p.campaign.lastSyncedAt) })}</p>}
             </section>
           )}
 

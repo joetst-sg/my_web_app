@@ -1,5 +1,7 @@
 # GREEN FUNDING import
 
+> Multiple sources (Indiegogo) and the AI writer: see [CROWDFUNDING.md](CROWDFUNDING.md).
+
 Imports authorized GREEN FUNDING campaigns as hidden product drafts, translates
 them from Japanese into English and Traditional Chinese, and publishes them
 only after an administrator approves. Buy Now always opens the exact campaign

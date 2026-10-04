@@ -99,6 +99,7 @@ export async function ProductCard({
           </Link>
         </h3>
         {size === 'large' && p.tagline && <p className="text-sm text-muted-foreground">{p.tagline}</p>}
+        {p.source_name && <p className="text-[0.7rem] text-muted-foreground">{t('product.via', { source: p.source_name })}</p>}
         {reason && <p className="text-xs text-muted-foreground">{reason}</p>}
         {showPrice && (
           <PriceDisplay price={p.price} originalPrice={p.compare_at_price} currency={p.currency} size="sm" className="mt-auto pt-1" />

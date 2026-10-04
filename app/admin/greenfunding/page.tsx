@@ -7,7 +7,9 @@ import { EmptyState, StatusPill } from '@/components/common/basics'
 import { ActionButton } from '@/components/admin/action-button'
 import { Button } from '@/components/ui/button'
 import { requireAdmin } from '@/lib/auth'
-import { approveAndPublish, rejectImport, syncNow, translateNow } from '@/lib/actions/greenfunding'
+import { approveAndPublish, checkAi, rejectImport, syncNow, translateNow } from '@/lib/actions/greenfunding'
+import { aiConfig } from '@/lib/ai'
+import { sourceDefinitions } from '@/lib/greenfunding/sources'
 import { greenFundingConfig } from '@/lib/greenfunding/config'
 import { translationConfig } from '@/lib/translation'
 import { productImageUrl } from '@/lib/images'
@@ -25,7 +27,8 @@ const FILTERS = [
   ['review', 'Pending review', ['pending_review', 'draft', 'approved']],
   ['published', 'Published', ['published']],
   ['rejected', 'Rejected', ['rejected', 'archived']],
-  ['errors', 'Sync errors', ['sync_error']],
+  ['errors', 'Failed', ['sync_error', 'failed']],
+  ['duplicates', 'Possible duplicates', ['duplicate']],
   ['skipped', 'Not eligible', ['not_eligible']],
 ] as const
 
@@ -36,20 +39,23 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
   const updatesOnly = sp.filter === 'updates'
   const config = greenFundingConfig()
   const tconfig = translationConfig()
+  const ai = aiConfig()
+  const defs = sourceDefinitions()
+  const sourceFilter = defs.find((d) => d.key === sp.source)?.key ?? null
   const supabase = await createClient()
 
   let q = supabase
     .from('product_source_metadata')
-    .select('id, product_id, source_url, source_campaign_id, source_status, pipeline_status, ja_title, created_at, update_available, needs_category_review, last_error, translated_content_hash, product:products ( id, name, slug, status, translations, images:product_images ( storage_path, position ) )')
-    .eq('source', 'greenfunding')
+    .select('id, source, source_name, product_id, source_url, source_campaign_id, source_status, pipeline_status, ja_title, created_at, update_available, needs_category_review, last_error, translated_content_hash, summary_word_count, product:products ( id, name, slug, status, translations, images:product_images ( storage_path, position ) )')
+  if (sourceFilter) q = q.eq('source', sourceFilter)
   if (updatesOnly) q = q.eq('update_available', true)
   else if (filter[2]) q = q.in('pipeline_status', [...filter[2]])
   else q = q.neq('pipeline_status', 'not_eligible')
 
   const [{ data: rows }, { data: counts }, { data: lastRun }, { data: jobs }, { data: mappings }, { data: categories }] = await Promise.all([
     q.order('created_at', { ascending: false }).limit(100),
-    supabase.from('product_source_metadata').select('pipeline_status, update_available, product_id').eq('source', 'greenfunding'),
-    supabase.from('sync_runs').select('*').eq('source', 'greenfunding').order('started_at', { ascending: false }).limit(1).maybeSingle(),
+    supabase.from('product_source_metadata').select('pipeline_status, update_available, product_id'),
+    supabase.from('sync_runs').select('*').order('started_at', { ascending: false }).limit(20),
     supabase.from('translation_jobs').select('product_id, status, attempts, max_attempts, created_at').order('created_at', { ascending: false }).limit(500),
     supabase.from('category_mappings').select('source_category, category_id, priority').eq('source', 'greenfunding').order('priority').order('source_category'),
     supabase.from('categories').select('id, name, parent_id, sort_order').order('sort_order'),
@@ -58,13 +64,15 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
   const count = (statuses: string[]) => (counts ?? []).filter((c) => statuses.includes(c.pipeline_status)).length
   const latestJob = new Map<string, NonNullable<typeof jobs>[number]>()
   for (const j of jobs ?? []) if (!latestJob.has(j.product_id)) latestJob.set(j.product_id, j)
-  const nextSync = lastRun ? new Date(Date.parse(lastRun.started_at) + config.syncIntervalMinutes * 60_000).toISOString() : null
+  const lastRunBySource = new Map<string, NonNullable<typeof lastRun>[number]>()
+  for (const r of lastRun ?? []) if (!lastRunBySource.has(r.source)) lastRunBySource.set(r.source, r)
   const stats = [
     ['New imports', count(['imported', 'translating'])],
     ['Pending review', count(['pending_review', 'draft', 'approved'])],
     ['Published', count(['published'])],
     ['Rejected', count(['rejected', 'archived'])],
-    ['Sync errors', count(['sync_error'])],
+    ['Failed', count(['sync_error', 'failed'])],
+    ['Possible duplicates', count(['duplicate'])],
     ['Updates available', (counts ?? []).filter((c) => c.update_available).length],
     ['Products imported', (counts ?? []).filter((c) => c.product_id).length],
     ['Awaiting translation', (jobs ?? []).filter((j) => j.status === 'queued' || j.status === 'running').length],
@@ -75,7 +83,7 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="eyebrow">Import</p>
-          <h1 className="font-display text-3xl font-bold">GREEN FUNDING</h1>
+          <h1 className="font-display text-3xl font-bold">Crowdfunding imports</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             {config.mode === 'production' && config.autoPublish
               ? 'New campaigns are imported, translated to English and Traditional Chinese, and published automatically once the safety checks pass. Anything that fails a check waits here for review.'
@@ -84,6 +92,7 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
         </div>
         <div className="flex flex-wrap gap-2">
           <Button asChild variant="ghost"><Link href="/admin/greenfunding/logs"><ScrollText />Sync log</Link></Button>
+          <ActionButton action={checkAi} variant="ghost">Check AI</ActionButton>
           <ActionButton action={translateNow}>Translate now</ActionButton>
           <ActionButton action={syncNow} variant="default"><RefreshCw />Sync now</ActionButton>
         </div>
@@ -92,15 +101,21 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
       <div className={cn('rounded-2xl border p-4 text-sm', config.mode === 'test' ? 'border-[oklch(0.8_0.12_80)] bg-[oklch(0.97_0.04_85)]' : 'bg-surface')}>
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <span><strong>Mode:</strong> {config.mode === 'test' ? 'TEST — imports and translates, never publishes' : config.autoPublish ? 'Production · auto-publish ON (published as soon as translated)' : 'Production · manual review'}</span>
-          <span><strong>Last sync:</strong> {lastRun ? `${fmtDate(lastRun.finished_at ?? lastRun.started_at)} (${lastRun.status})` : 'never'}</span>
-          <span><strong>Next sync:</strong> {nextSync ? `≈ ${fmtDate(nextSync)}` : 'on the next scheduler tick'} · every {config.syncIntervalMinutes} min</span>
-          <span><strong>Translation:</strong> {tconfig.apiKey ? `${tconfig.provider} · ${tconfig.model}` : <span className="text-destructive">no TRANSLATION_API_KEY set</span>}</span>
+          <span><strong>Content:</strong> {ai.provider && ai.apiKey ? `AI summaries · ${ai.provider} · ${ai.model}` : tconfig.apiKey ? `machine translation · ${tconfig.provider} (Green Funding only)` : <span className="text-destructive">no AI_API_KEY or TRANSLATION_API_KEY set</span>}</span>
         </div>
-        {lastRun && (
-          <p className="mt-2 text-muted-foreground">
-            Last run: {lastRun.discovered} found · {lastRun.new_count} new · {lastRun.updated_count} updated · {lastRun.skipped_count} skipped · {lastRun.error_count} errors · {lastRun.requests} requests{lastRun.message ? ` · ${lastRun.message}` : ''}
-          </p>
-        )}
+        <ul className="mt-2 flex flex-col gap-1 text-muted-foreground">
+          {defs.map((d) => {
+            const run = lastRunBySource.get(d.key)
+            const next = run ? new Date(Date.parse(run.started_at) + d.config.syncIntervalMinutes * 60_000).toISOString() : null
+            return (
+              <li key={d.key}>
+                <strong className="text-foreground">{d.displayName}</strong> — {d.config.enabled ? `every ${d.config.syncIntervalMinutes} min` : <span className="text-destructive">disabled</span>}
+                {run && <> · last {fmtDate(run.finished_at ?? run.started_at)} ({run.status}): {run.discovered} found · {run.new_count} new · {run.updated_count} updated · {run.error_count} errors</>}
+                {d.config.enabled && next && <> · next ≈ {fmtDate(next)}</>}
+              </li>
+            )
+          })}
+        </ul>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -113,11 +128,16 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
       </div>
 
       <section className="flex flex-col gap-4">
+        <nav className="flex flex-wrap gap-1" aria-label="Filter by source">
+          {[[null, 'All sources'] as const, ...defs.map((d) => [d.key, d.displayName] as const)].map(([key, label]) => (
+            <Link key={label} href={key ? `/admin/greenfunding?source=${key}` : '/admin/greenfunding'} className={cn('rounded-full border px-3 py-1 text-xs', sourceFilter === key ? 'border-foreground bg-foreground text-background' : 'hover:bg-muted')}>{label}</Link>
+          ))}
+        </nav>
         <nav className="flex flex-wrap gap-1" aria-label="Filter imports">
           {[...FILTERS.map(([k, label]) => [k, label] as const), ['updates', 'Update available'] as const].map(([k, label]) => {
             const active = k === 'updates' ? updatesOnly : !updatesOnly && filter[0] === k
             return (
-              <Link key={k} href={k === 'all' ? '/admin/greenfunding' : `/admin/greenfunding?filter=${k}`} className={cn('rounded-full px-3 py-1.5 text-sm', active ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted')}>
+              <Link key={k} href={`/admin/greenfunding?${new URLSearchParams({ ...(k !== 'all' && { filter: k }), ...(sourceFilter && { source: sourceFilter }) })}`} className={cn('rounded-full px-3 py-1.5 text-sm', active ? 'bg-primary text-primary-foreground' : 'bg-background hover:bg-muted')}>
                 {label}
               </Link>
             )
@@ -142,13 +162,14 @@ export default async function GreenFundingPage({ searchParams }: PageProps<'/adm
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <PipelinePill status={r.pipeline_status} />
+                      <StatusPill tone="neutral">{r.source_name ?? r.source}</StatusPill>
                       <CampaignPill status={r.source_status} />
                       <StatusPill tone={ts.tone}>{ts.label}</StatusPill>
                       {p && <StatusPill tone={p.status === 'published' ? 'success' : 'neutral'}>{p.status === 'published' ? 'Public' : 'Hidden'}</StatusPill>}
                       {r.update_available && <StatusPill tone="accent">Update available</StatusPill>}
                       {r.needs_category_review && <StatusPill tone="warning">Uncategorized</StatusPill>}
                     </div>
-                    <p className="mt-2 line-clamp-1 text-sm text-muted-foreground" lang="ja">🇯🇵 {r.ja_title ?? '—'}</p>
+                    <p className="mt-2 line-clamp-1 text-sm text-muted-foreground" lang="ja">{r.source === 'greenfunding' ? '🇯🇵' : 'Source:'} {r.ja_title ?? '—'}</p>
                     <p className="line-clamp-1 font-medium">🇬🇧 {translated ? p?.name : <span className="text-muted-foreground">not translated yet</span>}</p>
                     <p className="line-clamp-1 text-sm" lang="zh-HK">繁 {zh?.name ?? <span className="text-muted-foreground">—</span>}</p>
                     <p className="mt-1 text-xs text-muted-foreground">
