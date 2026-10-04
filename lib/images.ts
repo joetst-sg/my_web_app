@@ -1,6 +1,6 @@
 const base = () => (process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/$/, '')
 
-export type Bucket = 'avatars' | 'product-images' | 'brand-images' | 'collection-images' | 'article-images'
+export type Bucket = 'avatars' | 'product-images' | 'brand-images'
 
 // Public URL for an object in a public bucket. Absolute URLs pass through.
 export function storageUrl(bucket: Bucket, path: string | null | undefined) {

@@ -2,7 +2,7 @@
 
 import Link from '@/components/i18n/link'
 import { usePathname } from '@/components/i18n/use-pathname'
-import { Bell, Bookmark, BellRing, FolderHeart, Heart, LayoutGrid, Lock, Rss, Settings, User } from 'lucide-react'
+import { Bell, Bookmark, BellRing, Heart, LayoutGrid, Lock, Rss, Settings, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/components/i18n/provider'
 
@@ -10,7 +10,6 @@ const items = [
   ['/account', 'account.nav.overview', LayoutGrid],
   ['/account/feed', 'account.nav.feed', Rss],
   ['/account/saved', 'account.nav.saved', Bookmark],
-  ['/account/collections', 'account.nav.collections', FolderHeart],
   ['/account/following', 'account.nav.following', Heart],
   ['/account/reminders', 'account.nav.reminders', BellRing],
   ['/account/notifications', 'account.nav.notifications', Bell],

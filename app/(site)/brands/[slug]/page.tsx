@@ -3,14 +3,12 @@ import { notFound } from 'next/navigation'
 import { cache } from 'react'
 import { BadgeCheck, Globe } from 'lucide-react'
 import { BrandMark, SectionHeader } from '@/components/common/basics'
-import { CollectionCard } from '@/components/common/cards'
 import { FollowButton } from '@/components/common/follow-button'
 import { TrackOnMount } from '@/components/common/track'
 import { Button } from '@/components/ui/button'
 import { ProductGrid } from '@/components/product/product-grid'
 import { ProductListing } from '@/components/product/product-listing'
 import { getViewer } from '@/lib/auth'
-import { withCollectionImages } from '@/lib/db/content'
 import { CARD_COLUMNS, parseFilters, type ProductCardData } from '@/lib/db/products'
 import { hueFor } from '@/lib/images'
 import { alternatesFor, getT } from '@/lib/i18n/server'
@@ -53,17 +51,6 @@ export default async function BrandPage({ params, searchParams }: PageProps<'/br
     supabase.from('products').select('id').eq('brand_id', brand.id).eq('status', 'published'),
   ])
   const ids = (productRows ?? []).map((p) => p.id)
-  const { data: links } = ids.length ? await supabase.from('collection_products').select('collection_id').in('product_id', ids) : { data: [] }
-  const collectionIds = [...new Set((links ?? []).map((l) => l.collection_id))]
-  const { data: cols } = collectionIds.length
-    ? await supabase
-        .from('collections')
-        .select('id, slug, title, description, product_count, is_editorial, visibility, owner_id, follower_count, updated_at')
-        .in('id', collectionIds)
-        .eq('visibility', 'public')
-        .limit(4)
-    : { data: [] }
-  const collections = await withCollectionImages(cols ?? [])
   const hue = hueFor(brand.name)
   const socials = Object.entries((brand.social_links ?? {}) as Record<string, string>).filter(([, u]) => typeof u === 'string' && u.startsWith('https://'))
 
@@ -115,14 +102,6 @@ export default async function BrandPage({ params, searchParams }: PageProps<'/br
             <SectionHeader title={t('pages.products.title')} />
             <ProductListing filters={filters} fixed={{ brand: slug }} basePath={`/brands/${slug}`} defaultSort="newest" />
           </section>
-          {collections.length > 0 && (
-            <section>
-              <SectionHeader title={t('pages.brand.inCollections')} />
-              <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-                {collections.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
-              </div>
-            </section>
-          )}
         </div>
       </div>
     </div>

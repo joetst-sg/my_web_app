@@ -19,17 +19,10 @@ describe.skipIf(!hasTestEnv)('row level security', () => {
     expect(error).not.toBeNull()
   })
 
-  it('users see only their own saves and private collections', async () => {
-    const user1 = await clientFor('user1')
+  it('users see only their own saves', async () => {
     const user2 = await clientFor('user2')
     const { data: saves } = await user2.client.from('product_saves').select('user_id')
     expect(saves!.every((s) => s.user_id === user2.userId)).toBe(true)
-    const { data: priv } = await user1.client.from('collections').select('id').eq('owner_id', user1.userId).eq('visibility', 'private')
-    expect(priv!.length).toBeGreaterThan(0)
-    const { data: seen } = await user2.client.from('collections').select('id').in('id', priv!.map((c) => c.id))
-    expect(seen).toEqual([])
-    const { data: edited } = await user2.client.from('collections').update({ title: 'hijacked' }).in('id', priv!.map((c) => c.id)).select('id')
-    expect(edited ?? []).toEqual([])
   })
 
   it('users cannot fake counters, roles or editorial scores', async () => {

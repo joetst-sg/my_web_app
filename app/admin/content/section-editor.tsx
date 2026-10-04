@@ -19,9 +19,7 @@ export const SECTION_TYPES = {
   trending_products: 'Trending products',
   editors_picks: "Editor's picks",
   new_products: 'New products',
-  featured_collections: 'Featured collections',
   deals: 'Deals',
-  magazine: 'Magazine articles',
   product_list: 'Hand-picked products',
 } as const
 

@@ -8,7 +8,6 @@ import type { MessageKey, Translate } from './translate'
 // [pattern, key, names of the captured values]
 const PATTERNS: [RegExp, MessageKey, string[]][] = [
   // titles
-  [/^New in "(.+)"$/, 'notif.collectionNewTitle', ['name']],
   [/^New follower$/, 'notif.newFollowerTitle', []],
   [/^New product submission$/, 'notif.submissionTitle', []],
   [/^Changes requested$/, 'notif.changesTitle', []],
@@ -23,9 +22,7 @@ const PATTERNS: [RegExp, MessageKey, string[]][] = [
   [/^New message from seller$/, 'notif.sellerMessageTitle', []],
   [/^New message from the editors$/, 'notif.editorMessageTitle', []],
   // bodies
-  [/^A product was added to a collection you follow\.$/, 'notif.collectionNewBody', []],
   [/^Someone started following (.+)\.$/, 'notif.brandFollowerBody', ['name']],
-  [/^Someone saved your collection "(.+)"\.$/, 'notif.collectionFollowerBody', ['name']],
   [/^"(.+)" is waiting for review\.$/, 'notif.submissionBody', ['name']],
   [/^An editor asked for changes to "(.+)"\.$/, 'notif.changesBody', ['name']],
   [/^"(.+)" was not accepted\.$/, 'notif.rejectedBody', ['name']],

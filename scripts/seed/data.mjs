@@ -1,4 +1,4 @@
-// Fictional demo content. Every brand, product, person and article here is
+// Fictional demo content. Every brand, product, and person here is
 // invented for development; none of it describes a real company or product.
 
 export const categories = [
@@ -135,23 +135,6 @@ export const workflowProducts = [
   { name: 'Ridgeback Pocket Stove', brand: 'ridgeback-outdoor', cats: ['outdoor'], price: 99, shape: 'lantern', hue: 20, tags: ['camping', 'cooking'], seller: 'seller3', state: 'scheduled', tagline: 'A 70 g stove with a piezo igniter.', blurb: 'Pocket Stove boils half a litre in three minutes and folds smaller than a lighter case.', features: ['Piezo igniter', 'Wind shield', '70 g'], specs: { Weight: '70 g', Output: '2.8 kW' } },
 ]
 
-export const collections = [
-  { title: 'Best AI Gadgets of the Year', editorial: true, featured: true, description: 'The on-device AI products our editors actually kept using after the review period ended.', products: ['Tessellate Lingo One', 'Parsec Pip Desk Robot', 'Tessellate Minutes', 'Hearth & Byte Countertop Oven Eye', 'Parsec Rover Home Assistant'] },
-  { title: 'The Calm Desk', editorial: true, featured: true, description: 'Everything for a quiet, focused, cable-free workspace.', products: ['Orbital Float Monitor Arm', 'Orbital Glow Monitor Light', 'Quillwork Slate Notebook', 'Quillwork Tactile Keyboard', 'Quillwork Focus Timer', 'Lumen & Oak Solstice Lamp'] },
-  { title: 'Carry-On Essentials', editorial: true, featured: true, description: 'Our tested kit for traveling with one bag.', products: ['Driftline Carry 35', 'Driftline Cube Set', 'Pocketwise Fold Charger 65', 'Pocketwise Tag Tracker', 'Tessellate Lingo One', 'Brightwater Pure Bottle'] },
-  { title: 'Smart Home Without the Cloud', editorial: true, featured: true, description: 'Devices that keep working locally when the internet goes down.', products: ['Nimbus Keystone Lock', 'Nimbus Sense Hub', 'Nimbus Watchpost Camera', 'Fernhill Clear Air Monitor', 'Lumen & Oak Halo Strip'] },
-  { title: 'Crowdfunding & Coming Soon', editorial: true, featured: false, description: 'Projects we are watching before they ship.', products: ['Petrichor Charge Garden', 'Tessellate Glance Glasses', 'Parsec Rover Home Assistant', 'Veloce Rowline Compact Rower'] },
-  { title: 'Weekend Off-Grid', editorial: true, featured: false, description: 'Power, light and navigation for two nights outside.', products: ['Ridgeback Sunpack 20', 'Ridgeback Beacon Lantern', 'Ridgeback Trailmate Navigator', 'Cinder Ember Speaker', 'Brightwater Pure Bottle'] },
-  { title: 'Gifts Under $100', editorial: true, featured: true, description: 'Great gadgets that do not break the budget.', products: ['Moonforge Tide Controller', 'Pocketwise Tag Tracker', 'Quillwork Focus Timer', 'Tallow Sear Probe', 'Voltra Air Pump Mini', 'Hearth & Byte Scale Plus', 'Petrichor Solar Speaker'] },
-  { title: 'Creator Starter Kit', editorial: true, featured: false, description: 'Camera, audio and lighting for your first videos.', products: ['Grainfield F1 Compact', 'Kestrel Slate Gimbal', 'Halden Studio Monitor 5', 'Arclight Stream Deck Mini', 'Orbital Glow Monitor Light'] },
-  { title: 'Better Sleep Tech', editorial: true, featured: false, description: 'Tools that help you fall asleep and wake up rested.', products: ['Sable Loop Ring', 'Fernhill Drift Sleep Headband', 'Fernhill Clear Air Monitor', 'Lumen & Oak Solstice Lamp'] },
-  { title: 'Home Gym, Small Apartment', editorial: true, featured: false, description: 'Compact training gear that stores away.', products: ['Veloce Form Bar', 'Veloce Rollout Recovery Roller', 'Veloce Rowline Compact Rower', 'Sable Stride Band', 'Veloce Pace Watch'] },
-  // user collections
-  { title: 'My Dream Desk Setup', owner: 'user1', visibility: 'public', description: 'Slowly building the perfect desk.', products: ['Orbital Float Monitor Arm', 'Quillwork Tactile Keyboard', 'Orbital Glow Monitor Light', 'Halden Studio Monitor 5'] },
-  { title: 'Japan trip 2027', owner: 'user1', visibility: 'private', description: 'Things to buy before the trip.', products: ['Tessellate Lingo One', 'Driftline Carry 35', 'Pocketwise Fold Charger 65'] },
-  { title: 'Audio wishlist', owner: 'user2', visibility: 'public', description: 'Headphones and speakers I want to try.', products: ['Halden Arc Pro', 'Cinder Ember Speaker', 'Halden Pebble Buds'] },
-]
-
 export const deals = [
   { product: 'Halden Arc Pro', price: 299, title: 'Launch-week price', days: [-2, 10] },
   { product: 'Kestrel Swift Drone', price: 579, title: 'Fly Kit bundle discount', days: [-5, 7], code: 'SWIFTFLY' },
@@ -160,19 +143,4 @@ export const deals = [
   { product: 'Moonforge Tide Controller', price: 69, title: 'Flash deal', days: [-0.5, 1.5] },
   { product: 'Quillwork Slate Notebook', price: 349, title: 'Back to work', days: [3, 17] },
   { product: 'Driftline Carry 35', price: 199, title: 'Last summer sale', days: [-30, -2] },
-]
-
-export const articles = [
-  { title: 'Hands-on: the offline translator that actually works on a plane', type: 'hands_on', cats: ['ai-gadgets', 'travel'], products: ['Tessellate Lingo One'], days: -1, excerpt: 'We took Lingo One through three airports and a mountain village with no signal. Here is what worked and what did not.' },
-  { title: 'The best noise-cancelling headphones for long flights', type: 'buying_guide', cats: ['audio', 'travel'], products: ['Halden Arc Pro', 'Halden Pebble Buds'], days: -3, excerpt: 'Comfort matters more than spec sheets after hour six. Our picks for long-haul listening.' },
-  { title: 'Review: Kestrel Swift is the drone to beat under 250 g', type: 'review', cats: ['photography', 'drones'], products: ['Kestrel Swift Drone'], days: -4, excerpt: 'A 1-inch sensor in a registration-free drone changes what a travel drone can do.' },
-  { title: 'How to build a smart home that works without the internet', type: 'how_to', cats: ['smart-home'], products: ['Nimbus Sense Hub', 'Nimbus Keystone Lock'], days: -6, excerpt: 'Local control, Matter and Thread explained, plus the devices we trust.' },
-  { title: 'Roundup: 12 desk upgrades under $200', type: 'roundup', cats: ['office', 'desk-setup'], products: ['Orbital Float Monitor Arm', 'Orbital Glow Monitor Light', 'Quillwork Focus Timer'], days: -8, excerpt: 'Small changes that make a big difference to a long working day.' },
-  { title: 'Interview: why Parsec built a robot with a physical camera shutter', type: 'interview', cats: ['ai-gadgets'], products: ['Parsec Pip Desk Robot'], days: -10, excerpt: 'The founders on privacy by design and why their robot has no cloud account.' },
-  { title: 'Hall-effect sticks explained: the end of controller drift?', type: 'news', cats: ['gaming'], products: ['Moonforge Tide Controller'], days: -12, excerpt: 'Magnetic sensors are spreading across controllers. Here is how they work.' },
-  { title: 'Buying guide: smart rings versus fitness bands', type: 'buying_guide', cats: ['wearables', 'health-wellness'], products: ['Sable Loop Ring', 'Sable Stride Band'], days: -14, excerpt: 'Which form factor fits your sleep and training goals better?' },
-  { title: 'Review: Grainfield F1 brings dials back to pocket cameras', type: 'review', cats: ['photography'], products: ['Grainfield F1 Compact'], days: -16, excerpt: 'A camera that makes you slow down — in a good way.' },
-  { title: 'Packing light: our one-bag travel system', type: 'how_to', cats: ['travel'], products: ['Driftline Carry 35', 'Driftline Cube Set', 'Pocketwise Fold Charger 65'], days: -19, excerpt: 'How our editors pack for two weeks with a single carry-on.' },
-  { title: 'Solar gadgets that are worth it (and some that are not)', type: 'roundup', cats: ['eco-tech', 'outdoor'], products: ['Ridgeback Sunpack 20', 'Petrichor Solar Speaker', 'Petrichor Charge Garden'], days: -22, excerpt: 'We measured real-world charging so you do not have to.' },
-  { title: 'Coming up: what we expect from connected kitchens next year', type: 'news', cats: ['kitchen'], products: ['Hearth & Byte Countertop Oven Eye'], days: 2, status: 'scheduled', excerpt: 'Cameras, sensors and fewer apps.' },
 ]

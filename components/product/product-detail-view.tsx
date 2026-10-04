@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { getI18n } from '@/lib/i18n/server'
 import type { MessageKey } from '@/lib/i18n/translate'
 import { videoEmbedUrl } from '@/lib/validation'
-import { AddToCollectionButton } from './add-to-collection'
 import { BuyButton } from './buy-button'
 import { DiscountBadge, PriceDisplay, RatingBadge } from './price'
 import { ProductGallery } from './product-gallery'
@@ -121,7 +120,6 @@ export async function ProductDetailView({
             <div className="flex flex-wrap gap-2" aria-label={t('product.previewDisabled')}>
               <Button size="lg" className="h-11 rounded-full px-5" disabled>{t('product.buyNow')} <ArrowUpRight /></Button>
               <Button size="lg" variant="outline" disabled>{t('product.save')}</Button>
-              <Button size="lg" variant="outline" disabled>{t('collections.addTo')}</Button>
               <Button size="lg" variant="outline" disabled>{t('reminder.remindMe')}</Button>
               <Button size="lg" variant="outline" disabled>{t('share.share')}</Button>
             </div>
@@ -129,7 +127,6 @@ export async function ProductDetailView({
             <div className="flex flex-wrap gap-2">
               {p.external_url && !unavailable && (p.campaign ? <BuyButton productId={p.id} label={t('product.gf.buy', { source: p.campaign.sourceName })} srLabel={t('product.gf.opens', { source: p.campaign.sourceName })} className="sm:min-w-64" /> : <BuyButton productId={p.id} />)}
               <SaveButton productId={p.id} productName={p.name} initialSaved={viewer?.saved} variant="full" />
-              <AddToCollectionButton productId={p.id} productName={p.name} />
               <ReminderButton productId={p.id} productName={p.name} availability={p.availability} initialSet={viewer?.reminded} variant="full" />
               {shareUrl && <ShareButton url={shareUrl} title={p.name} productId={p.id} />}
             </div>

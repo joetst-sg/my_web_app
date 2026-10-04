@@ -4,12 +4,10 @@ import { Suspense } from 'react'
 import { ChevronRight } from 'lucide-react'
 import Link from '@/components/i18n/link'
 import { SectionHeader } from '@/components/common/basics'
-import { CollectionCard } from '@/components/common/cards'
 import { TrackOnMount } from '@/components/common/track'
 import { ProductDetailView } from '@/components/product/product-detail-view'
 import { ProductGrid, ProductGridSkeleton } from '@/components/product/product-grid'
 import { getViewer } from '@/lib/auth'
-import { collectionsContainingProduct } from '@/lib/db/content'
 import { toProductView } from '@/lib/db/product-view'
 import { getProductBySlug, productsByIds } from '@/lib/db/products'
 import { localizePath } from '@/lib/i18n/config'
@@ -168,9 +166,8 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
 // Streamed after the main product content.
 async function RelatedSections({ productId }: { productId: string }) {
   const supabase = await createClient()
-  const [{ data: related }, collections, { t }] = await Promise.all([
+  const [{ data: related }, { t }] = await Promise.all([
     supabase.rpc('related_products', { _product_id: productId, result_limit: 8 }),
-    collectionsContainingProduct(productId),
     getI18n(),
   ])
   const relatedCards = await productsByIds((related ?? []).map((r) => r.product_id))
@@ -180,14 +177,6 @@ async function RelatedSections({ productId }: { productId: string }) {
         <section className="mt-20">
           <SectionHeader title={t('productPage.related')} subtitle={t('productPage.relatedHint')} />
           <ProductGrid products={relatedCards.slice(0, 8)} />
-        </section>
-      )}
-      {collections.length > 0 && (
-        <section className="mt-20">
-          <SectionHeader title={t('productPage.inCollections')} />
-          <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-            {collections.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
-          </div>
         </section>
       )}
     </>

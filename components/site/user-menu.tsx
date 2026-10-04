@@ -1,6 +1,6 @@
 'use client'
 
-import { Bookmark, FolderHeart, LogOut, Rss, Settings, Shield, Store, User } from 'lucide-react'
+import { Bookmark, LogOut, Rss, Settings, Shield, Store, User } from 'lucide-react'
 import Link from '@/components/i18n/link'
 import { useT } from '@/components/i18n/provider'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -39,7 +39,6 @@ export function UserMenu({ viewer }: { viewer: MenuViewer }) {
         <DropdownMenuGroup>
           <DropdownMenuItem asChild><Link href="/account/feed"><Rss />{t('account.nav.feed')}</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/account/saved"><Bookmark />{t('account.nav.saved')}</Link></DropdownMenuItem>
-          <DropdownMenuItem asChild><Link href="/account/collections"><FolderHeart />{t('account.nav.collections')}</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/account"><User />{t('nav.account')}</Link></DropdownMenuItem>
           <DropdownMenuItem asChild><Link href="/account/preferences"><Settings />{t('nav.settings')}</Link></DropdownMenuItem>
         </DropdownMenuGroup>

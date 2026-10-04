@@ -246,7 +246,3 @@ export function renderProductImage({ shape, hue, variant = 0 }) {
   </svg>`
   return sharp(Buffer.from(svg)).webp({ quality: 82 }).toBuffer()
 }
-
-export function renderArticleImage({ hue, shape }) {
-  return renderProductImage({ shape, hue, variant: 2 })
-}

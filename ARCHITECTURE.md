@@ -19,8 +19,8 @@ Browser ──► Vercel (Next.js 16, region syd1) ──► Supabase (Postgres 
 app/
   (site)/            public site, account, seller area (shared header/footer)
     page.tsx         homepage (sections from homepage_sections)
-    products/ categories/ brands/ collections/ magazine/ deals/ trending/ new/ discover/ search/
-    account/         signed-in user area (feed, saved, collections, reminders, …)
+    products/ categories/ brands/ deals/ trending/ new/ discover/ search/
+    account/         signed-in user area (feed, saved, following, reminders, …)
     seller/          seller landing + (app)/ dashboard, wizard, submissions, analytics
     onboarding/ submit/ about/ contact/ privacy/ terms/ cookies/ forbidden/
   (auth)/            login, signup, forgot/reset password, verify email
@@ -75,12 +75,12 @@ draft ─submit─► submitted ─start_review─► under_review
 ```
 
 - The only way to change status is `transition_submission()` (SECURITY DEFINER). It checks the actor's role, the allowed transition, that the product is complete (images, category, price, URL…), rate limits sellers (10/day), requires a message for rejections and change requests, records `submission_reviews`, writes the audit log, notifies the seller and queues an email.
-- `publish_due()` runs every minute (pg_cron) and publishes scheduled products and articles.
+- `publish_due()` runs every minute (pg_cron) and publishes scheduled products.
 - Sellers edit only while `draft` or `changes_requested`; editors can edit anytime.
 
 ## Images
 
-- Buckets: `avatars`, `product-images`, `brand-images`, `collection-images`, `article-images` (public) and `uploads` (private). Paths: `products/{product_id}/{uuid}.webp`, `avatars/{user_id}/{uuid}.webp`, `brands/{brand_id}/{uuid}.webp`.
+- Buckets: `avatars`, `product-images`, `brand-images` (public) and `uploads` (private). Paths: `products/{product_id}/{uuid}.webp`, `avatars/{user_id}/{uuid}.webp`, `brands/{brand_id}/{uuid}.webp`.
 - The browser validates each file (declared type, magic bytes, size, minimum dimensions), decodes it, resizes it and re-encodes it as WebP — which also strips EXIF/GPS metadata — then uploads directly to Storage with progress.
 - Buckets enforce MIME types and size limits; storage RLS only allows writing to paths the user may edit (e.g. `can_edit_product(product_id)`).
 - `next/image` serves responsive AVIF/WebP variants.
@@ -90,17 +90,17 @@ draft ─submit─► submitted ─start_review─► under_review
 
 - `product_cards` is a security-invoker view that joins brand, primary category, first image, active deal, score and flags. Listings query it with filters that live in the URL (`lib/filters.ts`).
 - `search_products()` combines full-text search (`tsvector`), trigram name similarity, and brand/tag/category name matches. `search_suggest()` powers autocomplete (debounced, cached, cancellable requests).
-- `refresh_popularity_scores()` (every 10 min) weights views ×1, saves ×5, collection adds ×4, shares ×4, buy clicks ×3, reminders ×3 with a 3-day half-life, plus a freshness boost and a small all-time base; the top 20 get `trending_rank`.
+- `refresh_popularity_scores()` (every 10 min) weights views ×1, saves ×5, shares ×4, buy clicks ×3, reminders ×3 with a 3-day half-life, plus a freshness boost and a small all-time base; the top 20 get `trending_rank`.
 - `personal_feed()` scores products by followed brands/categories, saved/collected/viewed products' brands and categories, popularity and freshness.
 - `related_products()` uses shared categories, tags, brand and price range.
 
 ## Analytics
 
-`analytics_events` stores first-party events without IPs or user agents. Clients can only send `page_view`, `product_view`, `product_share` and `search` through `track_event()` (validated, rate-limited, views de-duplicated per 30 minutes); saves, follows, collection changes, reminders, clicks and workflow events are written by database triggers so they can't be faked.
+`analytics_events` stores first-party events without IPs or user agents. Clients can only send `page_view`, `product_view`, `product_share` and `search` through `track_event()` (validated, rate-limited, views de-duplicated per 30 minutes); saves, follows, reminders, clicks and workflow events are written by database triggers so they can't be faked.
 
 ## Notifications and email
 
-- In-app notifications are written by database functions (workflow changes, reminders, price drops, new followers, collection activity).
+- In-app notifications are written by database functions (workflow changes, reminders, price drops, new followers).
 - Emails are inserted into `email_outbox` in the same transaction and sent by `/api/cron/email-outbox` through `lib/email/provider.ts` (Resend or console). A statement-level trigger calls that route via `pg_net` right after commit (seconds), a pg_cron job retries every 5 minutes, and Vercel Cron runs daily as a backup. Auth emails (confirm, reset, email change) are sent by Supabase Auth through custom SMTP.
 
 ## Decisions and trade-offs

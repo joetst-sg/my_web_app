@@ -15,8 +15,6 @@ export const mainNav: readonly { href: string; label: MessageKey }[] = [
   { href: '/categories', label: 'nav.categories' },
   { href: '/brands', label: 'nav.brands' },
   { href: '/trending', label: 'nav.trending' },
-  { href: '/collections', label: 'nav.collections' },
-  { href: '/magazine', label: 'nav.magazine' },
 ]
 
 export const interestCategories = [

@@ -3,11 +3,11 @@ import Image from 'next/image'
 import { Suspense } from 'react'
 import Link from '@/components/i18n/link'
 import { SectionHeader } from '@/components/common/basics'
-import { ArticleCard, CategoryCard, CollectionCard } from '@/components/common/cards'
+import { CategoryCard } from '@/components/common/cards'
 import { Hero } from '@/components/home/hero'
 import { ProductGrid, ProductGridSkeleton } from '@/components/product/product-grid'
 import { DiscountBadge, PriceDisplay } from '@/components/product/price'
-import { dealCards, featuredCategories, featuredCollections, homepageSections, latestArticles } from '@/lib/db/content'
+import { dealCards, featuredCategories, homepageSections } from '@/lib/db/content'
 import {
   newestProducts, productsByIds, productsForPlacement, trendingProducts, viewerProductState, type ProductCardData,
 } from '@/lib/db/products'
@@ -82,18 +82,6 @@ async function HomeSection({ section: s }: { section: Section }) {
       )
     case 'product_list':
       return <ProductSection title={title} subtitle={subtitle} products={await productsByIds((config.product_ids ?? []).slice(0, limit))} />
-    case 'featured_collections': {
-      const cols = await featuredCollections(Math.min(limit, 8))
-      if (cols.length === 0) return null
-      return (
-        <section className="container-page">
-          <SectionHeader title={title} subtitle={subtitle} href="/collections" linkLabel={viewAll} />
-          <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-            {cols.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
-          </div>
-        </section>
-      )
-    }
     case 'deals': {
       const deals = await dealCards({ status: 'active', limit })
       if (deals.length === 0) return null
@@ -119,18 +107,6 @@ async function HomeSection({ section: s }: { section: Section }) {
                 </Link>
               ))}
             </div>
-          </div>
-        </section>
-      )
-    }
-    case 'magazine': {
-      const { items } = await latestArticles(Math.min(limit, 6))
-      if (items.length === 0) return null
-      return (
-        <section className="container-page">
-          <SectionHeader title={title} subtitle={subtitle} href="/magazine" linkLabel={viewAll} />
-          <div className="grid gap-10 md:grid-cols-3">
-            {items.map((a) => <ArticleCard key={a.id} article={a} authorName={a.authorName} />)}
           </div>
         </section>
       )

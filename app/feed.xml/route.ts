@@ -6,17 +6,12 @@ export const revalidate = 1800
 const esc = (s: string | null | undefined) =>
   (s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' })[c]!)
 
-// RSS 2.0 feed of the latest articles and newly published products.
+// RSS 2.0 feed of newly published products.
 export async function GET() {
   const supabase = createPublicClient()
-  const [{ data: articles }, { data: products }] = await Promise.all([
-    supabase.from('articles').select('slug, title, excerpt, published_at').eq('status', 'published').order('published_at', { ascending: false }).limit(20),
-    supabase.from('products').select('slug, name, tagline, published_at').eq('status', 'published').order('published_at', { ascending: false }).limit(20),
-  ])
-  const items = [
-    ...(articles ?? []).map((a) => ({ title: a.title, link: `${site.url}/magazine/${a.slug}`, description: a.excerpt, date: a.published_at })),
-    ...(products ?? []).map((p) => ({ title: `New: ${p.name}`, link: `${site.url}/products/${p.slug}`, description: p.tagline, date: p.published_at })),
-  ]
+  const { data: products } = await supabase.from('products').select('slug, name, tagline, published_at').eq('status', 'published').order('published_at', { ascending: false }).limit(30)
+  const items = (products ?? [])
+    .map((p) => ({ title: `New: ${p.name}`, link: `${site.url}/products/${p.slug}`, description: p.tagline, date: p.published_at }))
     .filter((i) => i.date)
     .sort((a, b) => b.date!.localeCompare(a.date!))
     .slice(0, 30)

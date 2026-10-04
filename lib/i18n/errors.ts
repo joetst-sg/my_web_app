@@ -17,7 +17,6 @@ const DETAIL_KEYS: Record<string, MessageKey> = {
   'Choose a publish time in the future.': 'errors.futureTime',
   'You can submit up to 10 products a day. Please try again tomorrow.': 'errors.submitLimit',
   'You have sent a lot of reports recently. Please try again later.': 'errors.reportLimit',
-  'You have created a lot of collections recently. Please try again later.': 'errors.collectionLimit',
   'New submissions are paused right now. Your draft is saved — please try again later.': 'errors.submissionsPaused',
   'Product status can only be changed through the review workflow.': 'errors.statusWorkflow',
   'Reminders can only be cancelled.': 'errors.reminderCancelOnly',

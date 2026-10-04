@@ -243,7 +243,7 @@ export async function deleteProduct(productId: string): Promise<ActionResult> {
 }
 
 // ---------------------------------------------------------------------------
-// Brands, categories, collections
+// Brands and categories
 // ---------------------------------------------------------------------------
 
 export async function setBrandFlags(brandId: string, flags: { is_published?: boolean; is_verified?: boolean }): Promise<ActionResult> {
@@ -300,114 +300,13 @@ export async function deleteCategory(id: string): Promise<ActionResult> {
   return done(['/admin/categories', '/categories'], 'Category deleted')
 }
 
-export async function setCollectionFlags(id: string, flags: { is_featured?: boolean; is_editorial?: boolean; visibility?: 'public' | 'private' }): Promise<ActionResult> {
-  if (!uuid.safeParse(id).success) return { ok: false, error: 'Unknown collection.' }
-  const { supabase, ok } = await staff()
-  if (!ok) return { ok: false, error: FORBIDDEN }
-  const { error } = await supabase.from('collections').update(flags).eq('id', id)
-  if (error) return { ok: false, error: friendlyError(error) }
-  return done(['/admin/collections', '/collections', '/'], 'Collection updated')
-}
-
-export async function createEditorialCollection(title: string, description: string): Promise<ActionResult<{ id: string }>> {
-  const parsed = z.object({ title: z.string().trim().min(2).max(80), description: z.string().trim().max(600) }).safeParse({ title, description })
-  if (!parsed.success) return { ok: false, error: 'Give the collection a name (2–80 characters).' }
-  const { supabase, ok } = await staff()
-  if (!ok) return { ok: false, error: FORBIDDEN }
-  const { data, error } = await supabase
-    .from('collections')
-    .insert({ title: parsed.data.title, description: parsed.data.description || null, slug: `${slugify(parsed.data.title)}-${randomSuffix(4)}`, visibility: 'public', is_editorial: true })
-    .select('id')
-    .single()
-  if (error) return { ok: false, error: friendlyError(error) }
-  revalidatePath('/admin/collections')
-  return { ok: true, data, message: 'Collection created' }
-}
-
-export async function deleteCollectionAdmin(id: string): Promise<ActionResult> {
-  if (!uuid.safeParse(id).success) return { ok: false, error: 'Unknown collection.' }
-  const { supabase, ok } = await staff(true)
-  if (!ok) return { ok: false, error: 'Only administrators can delete other users’ collections.' }
-  const { error } = await supabase.from('collections').delete().eq('id', id)
-  if (error) return { ok: false, error: friendlyError(error) }
-  return done(['/admin/collections', '/collections'], 'Collection deleted')
-}
-
-// ---------------------------------------------------------------------------
-// Articles
-// ---------------------------------------------------------------------------
-
-const articleSchema = z.object({
-  id: uuid.optional(),
-  title: z.string().trim().min(3).max(160),
-  slug: z.string().trim().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(160).optional().or(z.literal('')),
-  excerpt: z.string().trim().max(400).optional().transform((v) => v || null),
-  content: z.string().max(100_000),
-  type: z.enum(['review', 'hands_on', 'buying_guide', 'news', 'roundup', 'how_to', 'interview']),
-  status: z.enum(['draft', 'review', 'scheduled', 'published', 'archived']),
-  featured_image_url: z.string().url().optional().or(z.literal('').transform(() => null)).nullable(),
-  seo_title: z.string().trim().max(70).optional().transform((v) => v || null),
-  seo_description: z.string().trim().max(170).optional().transform((v) => v || null),
-  scheduled_for: z.string().optional().transform((v) => (v ? new Date(v).toISOString() : null)),
-  category_ids: z.array(uuid).max(10).default([]),
-  product_ids: z.array(uuid).max(30).default([]),
-})
-
-export async function saveArticle(input: z.input<typeof articleSchema>): Promise<ActionResult<{ id: string }>> {
-  const parsed = articleSchema.safeParse(input)
-  if (!parsed.success) return { ok: false, error: msg(parsed.error.issues[0]?.message) ?? 'Please check the article.', fieldErrors: fieldMsgs(parsed.error.flatten().fieldErrors) }
-  const { supabase, ok } = await staff()
-  if (!ok) return { ok: false, error: FORBIDDEN }
-  const { id, slug, category_ids, product_ids, ...rest } = parsed.data
-  if (rest.status === 'scheduled' && (!rest.scheduled_for || new Date(rest.scheduled_for) <= new Date())) {
-    return { ok: false, error: 'Choose a publish time in the future.' }
-  }
-  const base = process.env.NEXT_PUBLIC_SUPABASE_URL
-  if (rest.featured_image_url && !rest.featured_image_url.startsWith(`${base}/storage/v1/object/public/article-images/`)) {
-    return { ok: false, error: 'Upload the featured image here instead of linking to another site.' }
-  }
-  const words = rest.content.split(/\s+/).filter(Boolean).length
-  const row = {
-    ...rest,
-    slug: slug || slugify(rest.title),
-    reading_minutes: Math.max(1, Math.round(words / 220)),
-    ...(rest.status === 'published' && { published_at: new Date().toISOString() }),
-  }
-  let articleId = id
-  if (id) {
-    const { data: existing } = await supabase.from('articles').select('published_at').eq('id', id).single()
-    const { error } = await supabase.from('articles').update({ ...row, ...(existing?.published_at && rest.status === 'published' && { published_at: existing.published_at }) }).eq('id', id)
-    if (error) return { ok: false, error: error.code === '23505' ? 'Another article already uses that slug.' : friendlyError(error) }
-  } else {
-    const { data, error } = await supabase.from('articles').insert(row).select('id').single()
-    if (error) return { ok: false, error: error.code === '23505' ? 'Another article already uses that slug.' : friendlyError(error) }
-    articleId = data.id
-  }
-  await supabase.from('article_categories').delete().eq('article_id', articleId!)
-  if (category_ids.length) await supabase.from('article_categories').insert(category_ids.map((category_id) => ({ article_id: articleId!, category_id })))
-  await supabase.from('article_products').delete().eq('article_id', articleId!)
-  if (product_ids.length) await supabase.from('article_products').insert(product_ids.map((product_id, position) => ({ article_id: articleId!, product_id, position })))
-  revalidatePath('/magazine', 'layout')
-  revalidatePath('/admin/articles')
-  return { ok: true, data: { id: articleId! }, message: 'Article saved' }
-}
-
-export async function deleteArticle(id: string): Promise<ActionResult> {
-  if (!uuid.safeParse(id).success) return { ok: false, error: 'Unknown article.' }
-  const { supabase, ok } = await staff(true)
-  if (!ok) return { ok: false, error: 'Only administrators can delete articles. Archive it instead.' }
-  const { error } = await supabase.from('articles').delete().eq('id', id)
-  if (error) return { ok: false, error: friendlyError(error) }
-  return done(['/admin/articles', '/magazine'], 'Article deleted')
-}
-
 // ---------------------------------------------------------------------------
 // Homepage CMS
 // ---------------------------------------------------------------------------
 
 const sectionSchema = z.object({
   id: uuid.optional(),
-  type: z.enum(['hero', 'trending_products', 'featured_categories', 'new_products', 'featured_collections', 'magazine', 'product_list', 'deals', 'editors_picks']),
+  type: z.enum(['hero', 'trending_products', 'featured_categories', 'new_products', 'product_list', 'deals', 'editors_picks']),
   title: z.string().trim().max(80).optional().transform((v) => v || null),
   subtitle: z.string().trim().max(200).optional().transform((v) => v || null),
   limit: z.coerce.number().int().min(1).max(24).optional(),

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next'
 import Link from '@/components/i18n/link'
-import { Bell, BellRing, Bookmark, FolderHeart, Heart, Store } from 'lucide-react'
+import { Bell, BellRing, Bookmark, Heart, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { requireViewer } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
@@ -16,9 +16,8 @@ export default async function AccountPage() {
   const supabase = await createClient()
   const t = await getT()
   const count = (q: PromiseLike<{ count: number | null }>) => Promise.resolve(q).then((r) => r.count ?? 0)
-  const [saved, collections, brands, cats, reminders, unread] = await Promise.all([
+  const [saved, brands, cats, reminders, unread] = await Promise.all([
     count(supabase.from('product_saves').select('*', { count: 'exact', head: true }).eq('user_id', viewer.id)),
-    count(supabase.from('collections').select('*', { count: 'exact', head: true }).eq('owner_id', viewer.id)),
     count(supabase.from('brand_followers').select('*', { count: 'exact', head: true }).eq('user_id', viewer.id)),
     count(supabase.from('category_followers').select('*', { count: 'exact', head: true }).eq('user_id', viewer.id)),
     count(supabase.from('reminders').select('*', { count: 'exact', head: true }).eq('user_id', viewer.id).eq('status', 'pending')),
@@ -26,7 +25,6 @@ export default async function AccountPage() {
   ])
   const tiles = [
     ['/account/saved', t('account.overview.saved'), saved, Bookmark],
-    ['/account/collections', t('account.nav.collections'), collections, FolderHeart],
     ['/account/following', t('account.nav.following'), brands + cats, Heart],
     ['/account/reminders', t('account.overview.reminders'), reminders, BellRing],
     ['/account/notifications', t('account.overview.unread'), unread, Bell],

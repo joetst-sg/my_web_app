@@ -13,8 +13,8 @@ import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { articles, brands, categories, collections, deals, products, workflowProducts } from './data.mjs'
-import { renderArticleImage, renderProductImage } from './images.mjs'
+import { brands, categories, deals, products, workflowProducts } from './data.mjs'
+import { renderProductImage } from './images.mjs'
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..')
 
@@ -287,13 +287,12 @@ async function main() {
     await sql(`
       delete from auth.users where email like '%@loupe.example';
       truncate public.analytics_events, public.product_views, public.notifications, public.homepage_sections,
-        public.featured_products, public.deals, public.article_products, public.article_categories, public.article_tags,
-        public.articles, public.collection_products, public.collection_followers, public.collections, public.reminders,
+        public.featured_products, public.deals, public.reminders,
         public.reports, public.product_saves, public.submission_messages, public.submission_reviews, public.submissions,
         public.product_images, public.product_videos, public.product_specifications, public.product_scores,
         public.product_tags, public.product_categories, public.products, public.brand_followers, public.brands,
         public.category_followers, public.categories, public.tags, public.audit_logs, public.rate_limit_hits cascade;
-      delete from storage.objects where bucket_id in ('product-images', 'article-images');
+      delete from storage.objects where bucket_id = 'product-images';
     `)
   }
 
@@ -346,65 +345,6 @@ async function main() {
     ${Object.entries(featured).flatMap(([placement, names]) => names.map((n, i) => `(${pid(n)}, ${lit(placement)}, ${i}, ${lit(accounts.editor.id)})`)).join(',\n')};`)
   log('featured placements')
 
-  // Collections
-  for (const c of collections) {
-    const owner = accounts[c.owner || 'editor']
-    const slug = `${slugify(c.title)}-${crypto.randomBytes(2).toString('hex')}`
-    await sql(`
-      with col as (
-        insert into public.collections (slug, owner_id, title, description, visibility, is_editorial, is_featured, created_at)
-        values (${lit(slug)}, ${lit(owner.id)}, ${lit(c.title)}, ${lit(c.description)}, ${lit(c.visibility || 'public')},
-          ${lit(!!c.editorial)}, ${lit(!!c.featured)}, now() - interval '${Math.floor(rand() * 30)} days')
-        returning id
-      )
-      insert into public.collection_products (collection_id, product_id, position)
-      select col.id, p.id, x.ord from col, unnest(${lit(c.products)}::text[]) with ordinality as x(name, ord)
-      join public.products p on p.name = x.name;
-    `)
-  }
-  log(`${collections.length} collections`)
-
-  // Articles with generated cover images
-  for (const [i, a] of articles.entries()) {
-    const slug = slugify(a.title)
-    const first = products.find((p) => p.name === a.products[0])
-    const cover = `articles/${crypto.randomUUID()}.webp`
-    await upload(editorJwt, 'article-images', cover, await renderArticleImage({ hue: first?.hue ?? 220, shape: first?.shape ?? 'tablet' }))
-    const coverUrl = `${SUPABASE_URL}/storage/v1/object/public/article-images/${cover}`
-    const sections = a.products.map((name) => {
-      const p = [...products, ...workflowProducts].find((x) => x.name === name)
-      return `## ${name}\n\n${p.tagline} ${p.blurb}\n\n${p.features.map((f) => `- ${f}`).join('\n')}`
-    })
-    const content = [
-      a.excerpt,
-      'Our editors spent time with each product in everyday use: commuting, working and travelling. Here is what stood out.',
-      ...sections,
-      '## The verdict',
-      `If you only pick one, start with the ${a.products[0]}. It is the most complete package here and the one we kept reaching for.`,
-      '_This article is fictional demo content created for development._',
-    ].join('\n\n')
-    const words = content.split(/\s+/).length
-    const status = a.status || 'published'
-    await sql(`
-      with art as (
-        insert into public.articles (slug, title, excerpt, content, featured_image_url, author_id, type, status, seo_title, seo_description,
-          reading_minutes, published_at, scheduled_for, created_at)
-        values (${lit(slug)}, ${lit(a.title)}, ${lit(a.excerpt)}, ${lit(content)}, ${lit(coverUrl)}, ${lit(accounts.editor.id)},
-          ${lit(a.type)}, ${lit(status)}, ${lit(a.title.slice(0, 70))}, ${lit(a.excerpt.slice(0, 170))}, ${Math.max(1, Math.round(words / 220))},
-          ${status === 'published' ? `now() + interval '${a.days} days'` : 'null'},
-          ${status === 'scheduled' ? `now() + interval '${a.days} days'` : 'null'}, now() - interval '${i + 3} days')
-        returning id
-      ), cats as (
-        insert into public.article_categories (article_id, category_id)
-        select art.id, c.id from art, public.categories c where c.slug = any(${lit(a.cats)}::text[])
-      )
-      insert into public.article_products (article_id, product_id, position)
-      select art.id, p.id, x.ord from art, unnest(${lit(a.products)}::text[]) with ordinality as x(name, ord)
-      join public.products p on p.name = x.name;
-    `)
-  }
-  log(`${articles.length} articles`)
-
   // Homepage sections (CMS-managed)
   await sql(`insert into public.homepage_sections (type, title, subtitle, config, position, translations) values
     ('hero', null, null, '{}'::jsonb, 0, '{}'::jsonb),
@@ -412,9 +352,7 @@ async function main() {
     ('trending_products', 'Trending this week', 'Ranked by saves, clicks and views over the last few days.', '{"limit": 8}'::jsonb, 2, '{"zh-HK": {"title": "本週熱門", "subtitle": "根據最近幾天的收藏、點擊和瀏覽排名。"}}'::jsonb),
     ('editors_picks', 'Editor''s picks', 'Products our team tested and loved.', '{"limit": 6}'::jsonb, 3, '{"zh-HK": {"title": "編輯精選", "subtitle": "我們團隊親身試用並喜愛的產品。"}}'::jsonb),
     ('new_products', 'Just published', 'Fresh from the review desk.', '{"limit": 8}'::jsonb, 4, '{"zh-HK": {"title": "最新上架", "subtitle": "剛剛通過編輯審核。"}}'::jsonb),
-    ('featured_collections', 'Curated collections', 'Hand-picked sets for specific needs.', '{"limit": 4}'::jsonb, 5, '{"zh-HK": {"title": "精選合集", "subtitle": "為特定需要挑選的產品組合。"}}'::jsonb),
-    ('deals', 'Deals worth knowing about', 'Verified price drops on products we cover.', '{"limit": 4}'::jsonb, 6, '{"zh-HK": {"title": "值得留意的優惠", "subtitle": "我們介紹過的產品的已核實減價。"}}'::jsonb),
-    ('magazine', 'From the magazine', 'Reviews, guides and interviews.', '{"limit": 3}'::jsonb, 7, '{"zh-HK": {"title": "雜誌精選", "subtitle": "評測、指南及訪問。"}}'::jsonb);`)
+    ('deals', 'Deals worth knowing about', 'Verified price drops on products we cover.', '{"limit": 4}'::jsonb, 6, '{"zh-HK": {"title": "值得留意的優惠", "subtitle": "我們介紹過的產品的已核實減價。"}}'::jsonb);`)
   log('homepage sections')
 
   // Demo user activity: follows, saves, reminders
@@ -483,8 +421,7 @@ async function main() {
   const [counts] = await sql(`select
     (select count(*) from public.brands) brands, (select count(*) from public.products) products,
     (select count(*) from public.products where status = 'published') published,
-    (select count(*) from public.categories) categories, (select count(*) from public.collections) collections,
-    (select count(*) from public.articles) articles, (select count(*) from public.deals) deals,
+    (select count(*) from public.categories) categories, (select count(*) from public.deals) deals,
     (select count(*) from public.submissions) submissions, (select count(*) from public.product_images) images`)
   console.log('\nDone:', counts)
   console.log('Demo account credentials: DEMO_ACCOUNTS.local.md (git-ignored)')

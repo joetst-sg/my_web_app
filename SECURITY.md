@@ -12,11 +12,11 @@
 | Capability | Visitor | User | Seller | Editor | Admin |
 |---|:-:|:-:|:-:|:-:|:-:|
 | Browse published content, search, Buy Now | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Save, collections, follows, reminders, reports | | ✓ | ✓ | ✓ | ✓ |
+| Save, follows, reminders, reports | | ✓ | ✓ | ✓ | ✓ |
 | Create brands/products, upload images, submit | | | ✓ | ✓ | ✓ |
 | Edit own product while draft / changes requested | | | ✓ | ✓ | ✓ |
 | Review, approve, reject, schedule, publish, edit any product | | | | ✓ | ✓ |
-| Scores, featured, deals, articles, homepage, categories | | | | ✓ | ✓ |
+| Scores, featured, deals, homepage, categories | | | | ✓ | ✓ |
 | Users, roles, suspension, settings, deletions | | | | | ✓ |
 
 ## Row Level Security
@@ -25,9 +25,8 @@ Highlights (see `supabase/migrations/…0003_auth_rls.sql`):
 
 - **Products**: visible if `published`, or to their seller, or to staff. Sellers can update only their own products in `draft`/`changes_requested`. A trigger rejects any direct `status` change and silently protects counters, so status only moves through `transition_submission()`.
 - **Product children** (images, specs, videos, categories, tags) follow `product_visible()` / `can_edit_product()`.
-- **Scores, deals, featured placements, articles, homepage, categories**: staff-only writes.
+- **Scores, deals, featured placements, homepage, categories**: staff-only writes.
 - **Saves, follows, reminders, notifications, settings**: owner-only. Notifications can only have `read_at` updated.
-- **Collections**: public ones readable by all; private ones only by the owner (and staff for moderation).
 - **Submissions / reviews**: readable by the seller and staff; written only by workflow functions. Messages can be written by the seller or staff.
 - **Analytics, audit logs**: staff read only; written only by functions and triggers. `email_outbox` and `rate_limit_hits` have no API access at all.
 - **Roles**: users can read their own; only `set_user_role()` (admin) changes them, and admins can't remove their own admin role.
@@ -51,7 +50,7 @@ Automated checks: `tests/integration/rls.test.ts` and `workflow.test.ts`; Supaba
 
 ## Abuse prevention
 
-- Rate limits (database-side): submissions 10/day per seller, reports 10/hour, collections 30/hour, analytics events 240/10 min per visitor, click counting 5/10 min per visitor and product.
+- Rate limits (database-side): submissions 10/day per seller, reports 10/hour, analytics events 240/10 min per visitor, click counting 5/10 min per visitor and product.
 - Supabase Auth throttles logins, sign-ups and email sends; email confirmation is required.
 - Duplicate detection by URL, SKU/model and name similarity is shown to sellers (published matches) and editors (all), never auto-rejected.
 - Admins can suspend accounts and pause all submissions.

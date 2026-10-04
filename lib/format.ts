@@ -81,15 +81,6 @@ export const labels = {
     rejected: 'Rejected',
     archived: 'Archived',
   },
-  articleType: {
-    review: 'Review',
-    hands_on: 'Hands-on',
-    buying_guide: 'Buying guide',
-    news: 'Tech news',
-    roundup: 'Roundup',
-    how_to: 'How-to',
-    interview: 'Interview',
-  },
   reportReason: {
     broken_link: 'Broken link',
     incorrect_information: 'Incorrect information',

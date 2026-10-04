@@ -17,12 +17,11 @@ export default async function FollowingPage() {
   const viewer = await requireViewer('/account/following')
   const supabase = await createClient()
   const { t, locale } = await getI18n()
-  const [{ data: brands }, { data: cats }, { data: cols }] = await Promise.all([
+  const [{ data: brands }, { data: cats }] = await Promise.all([
     supabase.from('brand_followers').select('brand:brands ( id, slug, name, logo_url, tagline )').eq('user_id', viewer.id),
     supabase.from('category_followers').select('category:categories ( id, slug, name, translations )').eq('user_id', viewer.id),
-    supabase.from('collection_followers').select('collection:collections ( id, slug, title, product_count )').eq('user_id', viewer.id),
   ])
-  const empty = !brands?.length && !cats?.length && !cols?.length
+  const empty = !brands?.length && !cats?.length
 
   return (
     <div>
@@ -55,19 +54,6 @@ export default async function FollowingPage() {
               ))}
             </ul>
           </section>
-          {(cols ?? []).length > 0 && (
-            <section>
-              <h2 className="mb-3 font-sans text-lg font-semibold tracking-normal">{t('account.following.collections', { count: cols!.length })}</h2>
-              <ul className="grid gap-3 sm:grid-cols-2">
-                {cols!.map(({ collection: c }) => c && (
-                  <li key={c.id} className="flex items-center gap-3 rounded-2xl border p-3">
-                    <Link href={`/collections/${c.slug}`} className="min-w-0 flex-1 truncate font-medium hover:underline">{c.title}</Link>
-                    <FollowButton kind="collection" id={c.id} name={c.title} initialFollowing size="sm" />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
         </div>
       )}
     </div>

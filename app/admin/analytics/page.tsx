@@ -29,7 +29,7 @@ export default async function AdminAnalyticsPage({ searchParams }: PageProps<'/a
   const byDay = new Map((s.daily ?? []).map((d) => [d.day, d]))
   const kpis = [
     ['Product views', views], ['Buy clicks', clicks], ['Conversion to seller site', views ? `${((clicks / views) * 100).toFixed(1)}%` : '—'],
-    ['Saves', t.product_save ?? 0], ['Shares', t.product_share ?? 0], ['Collection adds', t.collection_add ?? 0],
+    ['Saves', t.product_save ?? 0], ['Shares', t.product_share ?? 0],
     ['Searches', t.search ?? 0], ['Brand follows', t.brand_follow ?? 0], ['Reminders', t.reminder_created ?? 0],
     ['Submissions', t.submission_submitted ?? 0], ['Approved', t.submission_approved ?? 0], ['Rejected', t.submission_rejected ?? 0],
   ] as const

@@ -5,8 +5,8 @@ import type { MessageKey } from '@/lib/i18n/translate'
 import { site } from '@/lib/site'
 
 const columns: { title: MessageKey; links: [string, MessageKey][] }[] = [
-  { title: 'footer.discover', links: [['/discover', 'nav.discover'], ['/trending', 'nav.trending'], ['/new', 'footer.newProducts'], ['/deals', 'nav.deals'], ['/collections', 'nav.collections']] },
-  { title: 'footer.browse', links: [['/categories', 'nav.categories'], ['/brands', 'nav.brands'], ['/magazine', 'nav.magazine'], ['/search', 'footer.search']] },
+  { title: 'footer.discover', links: [['/discover', 'nav.discover'], ['/trending', 'nav.trending'], ['/new', 'footer.newProducts'], ['/deals', 'nav.deals']] },
+  { title: 'footer.browse', links: [['/categories', 'nav.categories'], ['/brands', 'nav.brands'], ['/search', 'footer.search']] },
   { title: 'footer.forMakers', links: [['/submit', 'nav.submitProductLong'], ['/seller', 'footer.sellerProgram'], ['/seller/dashboard', 'nav.sellerDashboard']] },
   { title: 'footer.company', links: [['/about', 'footer.about'], ['/contact', 'footer.contact'], ['/privacy', 'footer.privacy'], ['/terms', 'footer.terms'], ['/cookies', 'footer.cookies']] },
 ]

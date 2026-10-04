@@ -3,14 +3,12 @@ import { notFound } from 'next/navigation'
 import { cache, Suspense } from 'react'
 import Link from '@/components/i18n/link'
 import { SectionHeader } from '@/components/common/basics'
-import { CollectionCard } from '@/components/common/cards'
 import { CategoryIcon } from '@/components/common/category-icon'
 import { FollowButton } from '@/components/common/follow-button'
 import { TrackOnMount } from '@/components/common/track'
 import { ProductGrid, ProductGridSkeleton } from '@/components/product/product-grid'
 import { ProductListing } from '@/components/product/product-listing'
 import { getViewer } from '@/lib/auth'
-import { withCollectionImages } from '@/lib/db/content'
 import { categoryIdsForSlug, CARD_COLUMNS, parseFilters, type ProductCardData } from '@/lib/db/products'
 import { localized } from '@/lib/i18n/content'
 import { alternatesFor, getI18n } from '@/lib/i18n/server'
@@ -121,9 +119,6 @@ async function CategoryBody({ slug, categoryId, name, filters, unfiltered }: { s
         <SectionHeader title={t('categoryPage.all', { name })} />
         <ProductListing filters={filters} fixed={{ category: slug }} basePath={`/categories/${slug}`} />
       </section>
-      <Suspense fallback={null}>
-        <CategoryCollections ids={ids} />
-      </Suspense>
       <section>
         <h2 className="eyebrow mb-3">{t('categoryPage.related')}</h2>
         <div className="flex flex-wrap gap-2">
@@ -133,35 +128,5 @@ async function CategoryBody({ slug, categoryId, name, filters, unfiltered }: { s
         </div>
       </section>
     </>
-  )
-}
-
-// Public collections featuring products from this category.
-async function CategoryCollections({ ids }: { ids: string[] }) {
-  const supabase = await createClient()
-  const { data: links } = await supabase.from('product_categories').select('product_id').in('category_id', ids).limit(200)
-  const productIds = (links ?? []).map((l) => l.product_id)
-  const { data: colLinks } = productIds.length
-    ? await supabase.from('collection_products').select('collection_id').in('product_id', productIds).limit(200)
-    : { data: [] }
-  const collectionIds = [...new Set((colLinks ?? []).map((c) => c.collection_id))]
-  const { data: cols } = collectionIds.length
-    ? await supabase
-        .from('collections')
-        .select('id, slug, title, description, product_count, is_editorial, visibility, owner_id, follower_count, updated_at')
-        .in('id', collectionIds)
-        .eq('visibility', 'public')
-        .order('is_editorial', { ascending: false })
-        .limit(4)
-    : { data: [] }
-  const [collections, { t }] = await Promise.all([withCollectionImages(cols ?? []), getI18n()])
-  if (collections.length === 0) return null
-  return (
-    <section>
-      <SectionHeader title={t('nav.collections')} />
-      <div className="grid gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
-        {collections.map((c) => <CollectionCard key={c.id} collection={c} images={c.images} ownerName={c.ownerName} />)}
-      </div>
-    </section>
   )
 }

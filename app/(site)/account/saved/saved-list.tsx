@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { PriceDisplay } from '@/components/product/price'
 import { raisedOf } from '@/lib/raised'
-import { listMyCollections, setInCollection, toggleSave } from '@/lib/actions/engagement'
+import { toggleSave } from '@/lib/actions/engagement'
 import { productImageUrl } from '@/lib/images'
 import { useLocale } from '@/components/i18n/provider'
 import { fromTranslations } from '@/lib/i18n/content'
@@ -34,7 +34,6 @@ export function SavedList({
   const locale = useLocale()
   const pathname = usePathname()
   const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [collections, setCollections] = useState<{ id: string; title: string }[] | null>(null)
   const [pending, start] = useTransition()
 
   function nav(updates: Record<string, string | undefined>) {
@@ -51,29 +50,6 @@ export function SavedList({
       else toast.success(ids.length === 1 ? t('act.unsaved') : t('account.saved.removedMany', { count: ids.length }))
       setSelected(new Set())
       router.refresh()
-    })
-  }
-
-  function loadCollections() {
-    if (collections) return
-    start(async () => {
-      const res = await listMyCollections()
-      if (res.ok) setCollections(res.data)
-    })
-  }
-
-  function moveTo(collectionId: string) {
-    const ids = [...selected]
-    start(async () => {
-      const results = await Promise.all(ids.map((id) => setInCollection(collectionId, id, true)))
-      const failed = results.find((r) => !r.ok)
-      if (failed && !failed.ok) {
-        toast.error(failed.error)
-        return
-      }
-      const title = collections?.find((c) => c.id === collectionId)?.title
-      toast.success(t(ids.length === 1 ? 'account.saved.movedOne' : 'account.saved.movedMany', { count: ids.length, title: title ?? '' }))
-      setSelected(new Set())
     })
   }
 
@@ -99,18 +75,6 @@ export function SavedList({
         {selected.size > 0 && (
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <span className="text-sm text-muted-foreground">{t('account.saved.selected', { count: selected.size })}</span>
-            <Select onOpenChange={(o) => o && loadCollections()} onValueChange={moveTo}>
-              <SelectTrigger className="h-10 w-52" aria-label={t('account.saved.moveTo')}><SelectValue placeholder={t('account.saved.moveToPlaceholder')} /></SelectTrigger>
-              <SelectContent>
-                {collections === null ? (
-                  <SelectItem value="loading" disabled>{t('common.loading')}</SelectItem>
-                ) : collections.length === 0 ? (
-                  <SelectItem value="none" disabled>{t('account.saved.createFirst')}</SelectItem>
-                ) : (
-                  collections.map((c) => <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>)
-                )}
-              </SelectContent>
-            </Select>
             <Button variant="destructive" className="h-10" disabled={pending} onClick={() => remove([...selected])}>
               <Trash2 />{t('common.remove')}
             </Button>

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useSearchParams } from 'next/navigation'
 import {
-  BarChart3, BookOpen, Building2, FileCheck2, Flag, FolderHeart, LayoutDashboard, LayoutTemplate, Package, Rocket, Settings, Sparkles, Sprout, Tags, Users,
+  BarChart3, Building2, FileCheck2, Flag, LayoutDashboard, LayoutTemplate, Package, Rocket, Settings, Sparkles, Sprout, Tags, Users,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -15,13 +15,11 @@ const groups = [
     ['/admin/greenfunding?source=greenfunding', 'GREEN FUNDING', Sprout, true],
     ['/admin/greenfunding?source=indiegogo', 'Indiegogo', Rocket, true],
     ['/admin/featured', 'Featured', Sparkles, false],
-    ['/admin/articles', 'Articles', BookOpen, false],
     ['/admin/content', 'Homepage', LayoutTemplate, false],
   ]],
   ['Catalogue', [
     ['/admin/brands', 'Brands', Building2, false],
     ['/admin/categories', 'Categories', Tags, false],
-    ['/admin/collections', 'Collections', FolderHeart, false],
   ]],
   ['Operations', [
     ['/admin/reports', 'Reports', Flag, false],

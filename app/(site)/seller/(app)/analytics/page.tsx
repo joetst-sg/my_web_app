@@ -17,7 +17,7 @@ export default async function SellerAnalyticsPage() {
   const supabase = await createClient()
   const t = await getT()
   const [{ data: products }, { data: stats }] = await Promise.all([
-    supabase.from('products').select('id, name, slug, view_count, click_count, save_count, share_count, collection_count').eq('seller_id', viewer.id).eq('status', 'published'),
+    supabase.from('products').select('id, name, slug, view_count, click_count, save_count, share_count').eq('seller_id', viewer.id).eq('status', 'published'),
     supabase.rpc('seller_product_stats', { days: 30 }),
   ])
   if (!products?.length) {
@@ -66,7 +66,6 @@ export default async function SellerAnalyticsPage() {
               <th className="p-4 text-right font-medium">{t('seller.analytics.conversion')}</th>
               <th className="p-4 text-right font-medium">{t('seller.analytics.allTime')}</th>
               <th className="p-4 text-right font-medium">{t('seller.stats.saves')}</th>
-              <th className="p-4 text-right font-medium">{t('seller.analytics.inCollections')}</th>
               <th className="p-4 text-right font-medium">{t('seller.analytics.shares')}</th>
             </tr>
           </thead>
@@ -81,7 +80,6 @@ export default async function SellerAnalyticsPage() {
                   <td className="p-4 text-right">{m.views ? `${((m.clicks / m.views) * 100).toFixed(1)}%` : '—'}</td>
                   <td className="p-4 text-right">{p.view_count}</td>
                   <td className="p-4 text-right">{p.save_count}</td>
-                  <td className="p-4 text-right">{p.collection_count}</td>
                   <td className="p-4 text-right">{p.share_count}</td>
                 </tr>
               )
