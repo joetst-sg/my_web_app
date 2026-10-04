@@ -352,3 +352,18 @@ describe('Indiegogo images', () => {
     expect(removed).toEqual([['campaign-versa/hero a.png']])
   })
 })
+
+describe('amount raised instead of price', () => {
+  it('formats short amounts in the campaign currency', async () => {
+    const { formatters } = await import('@/lib/i18n/format')
+    expect(formatters('en').moneyCompact(3_435_112, 'USD')).toBe('US$3.4M')
+    expect(formatters('en').moneyCompact(7_757_127, 'HKD')).toBe('HK$7.8M')
+    expect(formatters('zh-HK').moneyCompact(3_435_112, 'USD')).toBe('US$3.4M')
+    expect(formatters('en').moneyCompact(null, 'USD')).toBeNull()
+  })
+  it('uses the raised amount only for crowdfunding products', async () => {
+    const { raisedOf } = await import('@/components/product/price')
+    expect(raisedOf({ source_name: 'Indiegogo', campaign_raised: 100, campaign_currency: 'USD' })).toEqual({ amount: 100, currency: 'USD' })
+    expect(raisedOf({ source_name: null, campaign_raised: null, campaign_currency: null })).toBeNull()
+  })
+})

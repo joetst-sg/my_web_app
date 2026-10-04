@@ -12,6 +12,15 @@ export function formatters(locale: Locale) {
       if (!Number.isFinite(n)) return null
       return new Intl.NumberFormat(lang, { style: 'currency', currency, maximumFractionDigits: n % 1 === 0 ? 0 : 2 }).format(n)
     },
+    // Short money amounts for headline figures, e.g. "US$3.4M" / "¥689萬".
+    moneyCompact(value: number | string | null | undefined, currency = 'USD') {
+      if (value === null || value === undefined || value === '') return null
+      const n = typeof value === 'string' ? Number(value) : value
+      if (!Number.isFinite(n)) return null
+      const out = new Intl.NumberFormat(lang, { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(n)
+      // Next to HK$ amounts, a bare "$" would be ambiguous.
+      return currency === 'USD' && out.startsWith('$') ? `US${out}` : out
+    },
     date,
     dateTime: (value: string | Date | null | undefined) => date(value, { dateStyle: 'medium', timeStyle: 'short' }),
     timeAgo(value: string | Date | null | undefined) {

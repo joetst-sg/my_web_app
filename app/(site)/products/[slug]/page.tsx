@@ -95,7 +95,8 @@ export default async function ProductPage({ params }: PageProps<'/products/[slug
       category: view.category?.name,
       url,
       offers:
-        view.price !== null && product.external_url
+        // Crowdfunding products have no fixed price (pledges vary).
+        view.price !== null && product.external_url && !c
           ? {
               '@type': 'Offer',
               price: view.price,

@@ -236,6 +236,8 @@ export const zhHK: Dictionary = {
       asOf: '數據來自 {source}，截至 {date}。',
     },
     priceTba: '價格待定',
+    raised: '已籌 {amount}',
+    crowdfundingNow: '眾籌進行中',
     was: '原價',
     percentOff: '減 {percent}%',
     scoreTitle: '編輯評分 {score}（滿分 10）',

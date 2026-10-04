@@ -2512,6 +2512,8 @@ export type Database = {
           brand_id: string | null
           brand_name: string | null
           brand_slug: string | null
+          campaign_currency: string | null
+          campaign_raised: number | null
           category_id: string | null
           category_ids: string[] | null
           category_name: string | null
@@ -2694,6 +2696,13 @@ export type Database = {
         }[]
       }
       process_due_reminders: { Args: never; Returns: number }
+      product_campaign_funding: {
+        Args: { _product_id: string }
+        Returns: {
+          currency: string
+          raised_amount: number
+        }[]
+      }
       product_source_name: { Args: { _product_id: string }; Returns: string }
       product_status_for: {
         Args: { _s: Database["public"]["Enums"]["submission_status"] }

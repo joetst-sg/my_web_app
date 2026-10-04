@@ -7,7 +7,7 @@ import { fromTranslations, localizeCard } from '@/lib/i18n/content'
 import { getI18n } from '@/lib/i18n/server'
 import type { ProductCardData } from '@/lib/db/products'
 import { BuyButton } from '@/components/product/buy-button'
-import { DiscountBadge, PriceDisplay, RatingBadge } from '@/components/product/price'
+import { DiscountBadge, PriceDisplay, RatingBadge, raisedOf } from '@/components/product/price'
 import { SaveButton } from '@/components/product/save-button'
 
 export async function Hero({ product, isSaved }: { product: ProductCardData; isSaved: boolean }) {
@@ -49,8 +49,8 @@ export async function Hero({ product, isSaved }: { product: ProductCardData; isS
             {p.tagline && <p className="mt-4 max-w-md text-lg text-muted-foreground">{p.tagline}</p>}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <PriceDisplay price={p.price} originalPrice={p.compare_at_price} currency={p.currency} size="lg" />
-            <DiscountBadge percent={p.discount_percent} />
+            <PriceDisplay price={p.price} originalPrice={p.compare_at_price} currency={p.currency} raised={raisedOf(p)} size="lg" />
+            {!p.source_name && <DiscountBadge percent={p.discount_percent} />}
             <RatingBadge score={p.score} />
           </div>
           <div className="flex flex-wrap items-center gap-2">

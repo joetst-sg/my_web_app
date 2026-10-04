@@ -105,8 +105,8 @@ export async function ProductDetailView({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <PriceDisplay price={p.price} originalPrice={p.compareAt} currency={p.currency} size="lg" />
-            <DiscountBadge percent={p.discount} />
+            <PriceDisplay price={p.price} originalPrice={p.compareAt} currency={p.currency} raised={p.campaign ? { amount: p.campaign.raisedAmount, currency: p.campaign.currency } : null} size="lg" />
+            {!p.campaign && <DiscountBadge percent={p.discount} />}
             <RatingBadge score={p.score?.overall} />
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">

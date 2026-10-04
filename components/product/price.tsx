@@ -4,13 +4,20 @@ import { Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFormatters, useT } from '@/components/i18n/provider'
 
+// Amount raised for crowdfunding products (shown instead of a price).
+export const raisedOf = (p: { source_name: string | null; campaign_raised: number | string | null; campaign_currency: string | null }) =>
+  p.source_name ? { amount: p.campaign_raised, currency: p.campaign_currency } : null
+
 export function PriceDisplay({
   price,
   originalPrice,
   currency = 'USD',
   size = 'md',
   className,
+  raised,
 }: {
+  // Crowdfunding products show the amount raised instead of a price.
+  raised?: { amount: number | string | null; currency: string | null } | null
   price: number | null | undefined
   originalPrice?: number | null
   currency?: string | null
@@ -19,6 +26,14 @@ export function PriceDisplay({
 }) {
   const t = useT()
   const f = useFormatters()
+  if (raised) {
+    const amount = Number(raised.amount) > 0 ? f.moneyCompact(raised.amount, raised.currency ?? 'USD') : null
+    return (
+      <span className={cn('font-semibold tabular-nums', size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-sm' : 'text-base', className)}>
+        {amount ? t('product.raised', { amount }) : t('product.crowdfundingNow')}
+      </span>
+    )
+  }
   const now = f.price(price, currency ?? 'USD')
   if (!now) return <span className={cn('text-sm text-muted-foreground', className)}>{t('product.priceTba')}</span>
   const was = originalPrice && price !== null && price !== undefined && originalPrice > price ? f.price(originalPrice, currency ?? 'USD') : null

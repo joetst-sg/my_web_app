@@ -236,6 +236,8 @@ export const en = {
       asOf: 'Figures from {source} as of {date}.',
     },
     priceTba: 'Price TBA',
+    raised: '{amount} raised',
+    crowdfundingNow: 'Crowdfunding now',
     was: 'was',
     percentOff: '{percent}% off',
     scoreTitle: 'Editorial score {score} out of 10',

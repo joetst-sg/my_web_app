@@ -10,7 +10,7 @@ import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { PriceDisplay } from '@/components/product/price'
+import { PriceDisplay, raisedOf } from '@/components/product/price'
 import { listMyCollections, setInCollection, toggleSave } from '@/lib/actions/engagement'
 import { productImageUrl } from '@/lib/images'
 import { useLocale } from '@/components/i18n/provider'
@@ -135,7 +135,7 @@ export function SavedList({
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">{p.brand_name} · {fromTranslations(p.category_translations, 'name', locale, p.category_name)}</p>
               <Link href={`/products/${p.slug}`} className="font-semibold hover:underline">{p.name}</Link>
-              <div><PriceDisplay price={p.price} originalPrice={p.compare_at_price} currency={p.currency} size="sm" /></div>
+              <div><PriceDisplay price={p.price} originalPrice={p.compare_at_price} currency={p.currency} raised={raisedOf(p)} size="sm" /></div>
             </div>
             <Button variant="ghost" size="icon-lg" aria-label={t('account.saved.removeOne', { name: p.name ?? '' })} disabled={pending} onClick={() => remove([p.id!])}>
               <Trash2 />

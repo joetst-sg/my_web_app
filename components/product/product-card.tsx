@@ -6,7 +6,7 @@ import { getI18n } from '@/lib/i18n/server'
 import type { MessageKey } from '@/lib/i18n/translate'
 import { productImageUrl } from '@/lib/images'
 import type { ProductCardData } from '@/lib/db/products'
-import { DiscountBadge, PriceDisplay, RatingBadge } from './price'
+import { DiscountBadge, PriceDisplay, RatingBadge, raisedOf } from './price'
 import { SaveButton } from './save-button'
 import { ReminderButton } from './reminder-button'
 
@@ -73,7 +73,7 @@ export async function ProductCard({
               {flag}
             </span>
           )}
-          <DiscountBadge percent={p.discount_percent} />
+          {!p.source_name && <DiscountBadge percent={p.discount_percent} />}
         </div>
         {(showSave || showReminder) && p.id && (
           <div className="absolute right-3 top-3 z-10 flex flex-col gap-2 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 md:has-[[aria-pressed=true]]:opacity-100">
@@ -102,7 +102,7 @@ export async function ProductCard({
         {p.source_name && <p className="text-[0.7rem] text-muted-foreground">{t('product.via', { source: p.source_name })}</p>}
         {reason && <p className="text-xs text-muted-foreground">{reason}</p>}
         {showPrice && (
-          <PriceDisplay price={p.price} originalPrice={p.compare_at_price} currency={p.currency} size="sm" className="mt-auto pt-1" />
+          <PriceDisplay price={p.price} originalPrice={p.compare_at_price} currency={p.currency} raised={raisedOf(p)} size="sm" className="mt-auto pt-1" />
         )}
       </div>
     </article>
