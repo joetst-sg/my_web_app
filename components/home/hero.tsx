@@ -7,7 +7,8 @@ import { fromTranslations, localizeCard } from '@/lib/i18n/content'
 import { getI18n } from '@/lib/i18n/server'
 import type { ProductCardData } from '@/lib/db/products'
 import { BuyButton } from '@/components/product/buy-button'
-import { DiscountBadge, PriceDisplay, RatingBadge, raisedOf } from '@/components/product/price'
+import { DiscountBadge, PriceDisplay, RatingBadge } from '@/components/product/price'
+import { raisedOf } from '@/lib/raised'
 import { SaveButton } from '@/components/product/save-button'
 
 export async function Hero({ product, isSaved }: { product: ProductCardData; isSaved: boolean }) {

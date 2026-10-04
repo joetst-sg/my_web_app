@@ -4,10 +4,6 @@ import { Star } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useFormatters, useT } from '@/components/i18n/provider'
 
-// Amount raised for crowdfunding products (shown instead of a price).
-export const raisedOf = (p: { source_name: string | null; campaign_raised: number | string | null; campaign_currency: string | null }) =>
-  p.source_name ? { amount: p.campaign_raised, currency: p.campaign_currency } : null
-
 export function PriceDisplay({
   price,
   originalPrice,

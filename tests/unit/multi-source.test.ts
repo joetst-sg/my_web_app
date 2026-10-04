@@ -362,7 +362,7 @@ describe('amount raised instead of price', () => {
     expect(formatters('en').moneyCompact(null, 'USD')).toBeNull()
   })
   it('uses the raised amount only for crowdfunding products', async () => {
-    const { raisedOf } = await import('@/components/product/price')
+    const { raisedOf } = await import('@/lib/raised')
     expect(raisedOf({ source_name: 'Indiegogo', campaign_raised: 100, campaign_currency: 'USD' })).toEqual({ amount: 100, currency: 'USD' })
     expect(raisedOf({ source_name: null, campaign_raised: null, campaign_currency: null })).toBeNull()
   })
