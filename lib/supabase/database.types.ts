@@ -17,10 +17,8 @@ export type Database = {
       analytics_events: {
         Row: {
           anon_id: string | null
-          article_id: string | null
           brand_id: string | null
           category_id: string | null
-          collection_id: string | null
           created_at: string
           event_type: string
           id: number
@@ -31,10 +29,8 @@ export type Database = {
         }
         Insert: {
           anon_id?: string | null
-          article_id?: string | null
           brand_id?: string | null
           category_id?: string | null
-          collection_id?: string | null
           created_at?: string
           event_type: string
           id?: never
@@ -45,10 +41,8 @@ export type Database = {
         }
         Update: {
           anon_id?: string | null
-          article_id?: string | null
           brand_id?: string | null
           category_id?: string | null
-          collection_id?: string | null
           created_at?: string
           event_type?: string
           id?: never
@@ -58,13 +52,6 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "analytics_events_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "analytics_events_brand_id_fkey"
             columns: ["brand_id"]
@@ -101,13 +88,6 @@ export type Database = {
             referencedColumns: ["category_id"]
           },
           {
-            foreignKeyName: "analytics_events_collection_id_fkey"
-            columns: ["collection_id"]
-            isOneToOne: false
-            referencedRelation: "collections"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "analytics_events_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
@@ -129,184 +109,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      article_categories: {
-        Row: {
-          article_id: string
-          category_id: string
-        }
-        Insert: {
-          article_id: string
-          category_id: string
-        }
-        Update: {
-          article_id?: string
-          category_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "article_categories_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_categories_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_categories_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "deal_cards"
-            referencedColumns: ["category_id"]
-          },
-          {
-            foreignKeyName: "article_categories_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "product_cards"
-            referencedColumns: ["category_id"]
-          },
-        ]
-      }
-      article_products: {
-        Row: {
-          article_id: string
-          position: number
-          product_id: string
-        }
-        Insert: {
-          article_id: string
-          position?: number
-          product_id: string
-        }
-        Update: {
-          article_id?: string
-          position?: number
-          product_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "article_products_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "deal_cards"
-            referencedColumns: ["product_id"]
-          },
-          {
-            foreignKeyName: "article_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "product_cards"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      article_tags: {
-        Row: {
-          article_id: string
-          tag_id: string
-        }
-        Insert: {
-          article_id: string
-          tag_id: string
-        }
-        Update: {
-          article_id?: string
-          tag_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "article_tags_article_id_fkey"
-            columns: ["article_id"]
-            isOneToOne: false
-            referencedRelation: "articles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "article_tags_tag_id_fkey"
-            columns: ["tag_id"]
-            isOneToOne: false
-            referencedRelation: "tags"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      articles: {
-        Row: {
-          author_id: string | null
-          content: string
-          created_at: string
-          excerpt: string | null
-          featured_image_url: string | null
-          id: string
-          published_at: string | null
-          reading_minutes: number
-          scheduled_for: string | null
-          seo_description: string | null
-          seo_title: string | null
-          slug: string
-          status: Database["public"]["Enums"]["article_status"]
-          title: string
-          type: Database["public"]["Enums"]["article_type"]
-          updated_at: string
-        }
-        Insert: {
-          author_id?: string | null
-          content?: string
-          created_at?: string
-          excerpt?: string | null
-          featured_image_url?: string | null
-          id?: string
-          published_at?: string | null
-          reading_minutes?: number
-          scheduled_for?: string | null
-          seo_description?: string | null
-          seo_title?: string | null
-          slug: string
-          status?: Database["public"]["Enums"]["article_status"]
-          title: string
-          type?: Database["public"]["Enums"]["article_type"]
-          updated_at?: string
-        }
-        Update: {
-          author_id?: string | null
-          content?: string
-          created_at?: string
-          excerpt?: string | null
-          featured_image_url?: string | null
-          id?: string
-          published_at?: string | null
-          reading_minutes?: number
-          scheduled_for?: string | null
-          seo_description?: string | null
-          seo_title?: string | null
-          slug?: string
-          status?: Database["public"]["Enums"]["article_status"]
-          title?: string
-          type?: Database["public"]["Enums"]["article_type"]
-          updated_at?: string
-        }
-        Relationships: []
       }
       audit_logs: {
         Row: {
@@ -595,133 +397,6 @@ export type Database = {
             referencedColumns: ["category_id"]
           },
         ]
-      }
-      collection_followers: {
-        Row: {
-          collection_id: string
-          created_at: string
-          user_id: string
-        }
-        Insert: {
-          collection_id: string
-          created_at?: string
-          user_id?: string
-        }
-        Update: {
-          collection_id?: string
-          created_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "collection_followers_collection_id_fkey"
-            columns: ["collection_id"]
-            isOneToOne: false
-            referencedRelation: "collections"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      collection_products: {
-        Row: {
-          added_at: string
-          collection_id: string
-          note: string | null
-          position: number
-          product_id: string
-        }
-        Insert: {
-          added_at?: string
-          collection_id: string
-          note?: string | null
-          position?: number
-          product_id: string
-        }
-        Update: {
-          added_at?: string
-          collection_id?: string
-          note?: string | null
-          position?: number
-          product_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "collection_products_collection_id_fkey"
-            columns: ["collection_id"]
-            isOneToOne: false
-            referencedRelation: "collections"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "collection_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "deal_cards"
-            referencedColumns: ["product_id"]
-          },
-          {
-            foreignKeyName: "collection_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "product_cards"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "collection_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      collections: {
-        Row: {
-          cover_image_url: string | null
-          created_at: string
-          description: string | null
-          follower_count: number
-          id: string
-          is_editorial: boolean
-          is_featured: boolean
-          owner_id: string | null
-          product_count: number
-          slug: string
-          title: string
-          updated_at: string
-          visibility: Database["public"]["Enums"]["visibility"]
-        }
-        Insert: {
-          cover_image_url?: string | null
-          created_at?: string
-          description?: string | null
-          follower_count?: number
-          id?: string
-          is_editorial?: boolean
-          is_featured?: boolean
-          owner_id?: string | null
-          product_count?: number
-          slug: string
-          title: string
-          updated_at?: string
-          visibility?: Database["public"]["Enums"]["visibility"]
-        }
-        Update: {
-          cover_image_url?: string | null
-          created_at?: string
-          description?: string | null
-          follower_count?: number
-          id?: string
-          is_editorial?: boolean
-          is_featured?: boolean
-          owner_id?: string | null
-          product_count?: number
-          slug?: string
-          title?: string
-          updated_at?: string
-          visibility?: Database["public"]["Enums"]["visibility"]
-        }
-        Relationships: []
       }
       deals: {
         Row: {
@@ -1606,7 +1281,6 @@ export type Database = {
           benefits: string[]
           brand_id: string | null
           click_count: number
-          collection_count: number
           created_at: string
           currency: string
           description: string | null
@@ -1642,7 +1316,6 @@ export type Database = {
           benefits?: string[]
           brand_id?: string | null
           click_count?: number
-          collection_count?: number
           created_at?: string
           currency?: string
           description?: string | null
@@ -1678,7 +1351,6 @@ export type Database = {
           benefits?: string[]
           brand_id?: string | null
           click_count?: number
-          collection_count?: number
           created_at?: string
           currency?: string
           description?: string | null
@@ -2598,7 +2270,6 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      article_visible: { Args: { _article_id: string }; Returns: boolean }
       campaign_info: {
         Args: { p_product_id: string }
         Returns: {
@@ -2617,13 +2288,8 @@ export type Database = {
         }[]
       }
       can_edit_brand: { Args: { _brand_id: string }; Returns: boolean }
-      can_edit_collection: {
-        Args: { _collection_id: string }
-        Returns: boolean
-      }
       can_edit_product: { Args: { _product_id: string }; Returns: boolean }
       cleanup_old_data: { Args: never; Returns: undefined }
-      collection_visible: { Args: { _collection_id: string }; Returns: boolean }
       create_notification: {
         Args: {
           _body: string
@@ -2784,11 +2450,9 @@ export type Database = {
       track_event: {
         Args: {
           anon_id?: string
-          article_id?: string
           brand_id?: string
           category_id?: string
           channel?: string
-          collection_id?: string
           event_type: string
           product_id?: string
           query?: string
@@ -2834,20 +2498,6 @@ export type Database = {
     }
     Enums: {
       app_role: "user" | "seller" | "editor" | "admin"
-      article_status:
-        | "draft"
-        | "review"
-        | "scheduled"
-        | "published"
-        | "archived"
-      article_type:
-        | "review"
-        | "hands_on"
-        | "buying_guide"
-        | "news"
-        | "roundup"
-        | "how_to"
-        | "interview"
       feature_placement:
         | "hero"
         | "featured_today"
@@ -3055,16 +2705,6 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["user", "seller", "editor", "admin"],
-      article_status: ["draft", "review", "scheduled", "published", "archived"],
-      article_type: [
-        "review",
-        "hands_on",
-        "buying_guide",
-        "news",
-        "roundup",
-        "how_to",
-        "interview",
-      ],
       feature_placement: [
         "hero",
         "featured_today",
