@@ -333,3 +333,22 @@ describe('admin maintenance actions', () => {
     }
   })
 })
+
+// Images are copied at import; rejected products leave no files behind.
+describe('Indiegogo images', () => {
+  it('are copied at import time', () => {
+    expect(sourceDefinition('indiegogo')!.deferImages).toBe(false)
+  })
+  it('removes the stored files of a rejected product', async () => {
+    const removed: string[][] = []
+    const q: Record<string, unknown> = {}
+    Object.assign(q, { select: () => q, eq: async () => ({ data: [
+      { storage_path: 'https://x.supabase.co/storage/v1/object/public/greenfunding-products/campaign-versa/hero%20a.png' },
+      { storage_path: 'https://elsewhere.example/image.png' },
+    ] }) })
+    const db = { from: () => q, storage: { from: () => ({ remove: async (paths: string[]) => { removed.push(paths); return { error: null } } }) } }
+    const { removeProductImageFiles } = await import('@/lib/greenfunding/sync')
+    expect(await removeProductImageFiles(db as never, 'p')).toBe(1)
+    expect(removed).toEqual([['campaign-versa/hero a.png']])
+  })
+})

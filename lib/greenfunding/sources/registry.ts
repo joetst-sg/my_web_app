@@ -95,7 +95,7 @@ export function sourceDefinitions(): SourceDefinition[] {
   }
   return [
     { key: 'greenfunding', displayName: 'GREEN FUNDING', language: 'ja', campaignPath: CAMPAIGN_PATHS.greenfunding, deferImages: false, requireTechProduct: false, config: gf, create: () => new HtmlCampaignSource(gf) },
-    { key: 'indiegogo', displayName: 'Indiegogo', language: 'en', campaignPath: CAMPAIGN_PATHS.indiegogo, deferImages: true, requireTechProduct: true, config: igg, create: () => new IndiegogoApiSource(igg) },
+    { key: 'indiegogo', displayName: 'Indiegogo', language: 'en', campaignPath: CAMPAIGN_PATHS.indiegogo, deferImages: false, requireTechProduct: true, config: igg, create: () => new IndiegogoApiSource(igg) },
   ]
 }
 

@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { getViewer } from '@/lib/auth'
 import type { ActionResult } from '@/lib/errors'
 import { greenFundingConfig } from '@/lib/greenfunding/config'
-import { backfillCategories, backfillSummaries, resyncOne, runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
+import { backfillCategories, backfillSummaries, removeProductImageFiles, resyncOne, runSync, logSync, type SyncResult } from '@/lib/greenfunding/sync'
 import { createAIProvider, aiConfig } from '@/lib/ai'
 import { sourceContentHash, translationSource } from '@/lib/greenfunding/content'
 import { campaignIdFromUrl, validateCampaignUrl } from '@/lib/greenfunding/url'
@@ -308,6 +308,7 @@ export async function deleteImport(productId: string): Promise<ActionResult> {
   const { meta, product } = await loadImport(db, productId)
   if (!meta || !product) return { ok: false, error: 'This is not an imported product.' }
   await db.from('product_source_metadata').update({ pipeline_status: 'archived', last_error: `Deleted by ${viewer.email}` }).eq('id', meta.id)
+  await removeProductImageFiles(db, productId)
   const { error } = await db.from('products').delete().eq('id', productId)
   if (error) return { ok: false, error: error.message }
   await logSync(db, { source: meta.source, operation: 'archive', status: 'success', campaignId: meta.source_campaign_id, campaignUrl: meta.source_url, message: `Product deleted by ${viewer.email}; it will not be re-imported` })

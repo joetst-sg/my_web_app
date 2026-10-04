@@ -1,6 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
-import { backfillCategories, backfillSummaries, runSync } from '@/lib/greenfunding/sync'
+import { backfillCategories, backfillImages, backfillSummaries, runSync } from '@/lib/greenfunding/sync'
 import { createServiceClient } from '@/lib/supabase/server'
 import { processTranslationQueue } from '@/lib/translation/queue'
 
@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
   const db = createServiceClient()
   const summaries = db ? await backfillSummaries(db) : null
   const categories = db ? await backfillCategories(db) : null
+  const images = db ? await backfillImages(db) : null
   const translations = await processTranslationQueue()
-  return NextResponse.json({ sync, summaries, categories, translations }, { headers: { 'Cache-Control': 'no-store' } })
+  return NextResponse.json({ sync, summaries, categories, images, translations }, { headers: { 'Cache-Control': 'no-store' } })
 }

@@ -414,6 +414,43 @@ export async function backfillSummaries(db: Db, config: GreenFundingConfig = gre
 
 // Gives uncategorized imports a category when the mappings or keywords now
 // allow one (e.g. after a mapping was added in the admin). No network calls.
+// Deletes a product's copied image files from storage (used when a product
+// is rejected as not eligible or deleted). The image rows go with the product.
+export async function removeProductImageFiles(db: Db, productId: string) {
+  const { data: rows } = await db.from('product_images').select('storage_path').eq('product_id', productId)
+  const marker = `/object/public/${IMAGE_BUCKET}/`
+  const paths = (rows ?? []).map((r) => r.storage_path).filter((p) => p.includes(marker)).map((p) => decodeURIComponent(p.slice(p.indexOf(marker) + marker.length)))
+  if (!paths.length) return 0
+  const { error } = await db.storage.from(IMAGE_BUCKET).remove(paths)
+  return error ? 0 : paths.length
+}
+
+// Imported products still without an image (e.g. imported while images were
+// copied later) get them from the stored source image URLs.
+export async function backfillImages(db: Db, limit = 10) {
+  const { data: rows } = await db
+    .from('product_source_metadata')
+    .select('source, source_campaign_id, product_id, raw_metadata')
+    .not('product_id', 'is', null)
+    .in('pipeline_status', ['imported', 'translating', 'pending_review', 'failed'])
+    .limit(100)
+  let imported = 0
+  let checked = 0
+  for (const r of rows ?? []) {
+    if (checked >= limit) break
+    const urls = ((r.raw_metadata as { imageUrls?: unknown[] } | null)?.imageUrls ?? []).filter((u): u is string => typeof u === 'string')
+    if (!urls.length) continue
+    const { count } = await db.from('product_images').select('id', { count: 'exact', head: true }).eq('product_id', r.product_id!)
+    if (count) continue
+    const def = sourceDefinition(r.source)
+    if (!def) continue
+    checked++
+    const res = await importCampaignImages(db, def.config, r.product_id!, { campaignId: slugify(r.source_campaign_id).slice(0, 80) || r.source_campaign_id, imageUrls: urls })
+    imported += res.imported
+  }
+  return { imported }
+}
+
 export async function backfillCategories(db: Db) {
   const { data: rows } = await db
     .from('product_source_metadata')

@@ -4,7 +4,7 @@ import { applyTranslationAutomatically, nextAttempt, pipelineAfterTranslation } 
 import { autoPublishIfEnabled } from '@/lib/greenfunding/publish'
 import { sourceDefinition } from '@/lib/greenfunding/sources'
 import { buildJapaneseSummary, cleanShortDescription } from '@/lib/greenfunding/summary'
-import { importCampaignImages, logSync, placeholderSlug } from '@/lib/greenfunding/sync'
+import { importCampaignImages, logSync, placeholderSlug, removeProductImageFiles } from '@/lib/greenfunding/sync'
 import { createServiceClient } from '@/lib/supabase/server'
 import { countWords, hasSimplified, wordRange } from './prompts'
 import { AIError, type AIProvider, type ChineseContent, type EnglishContent, type ProductFacts } from './types'
@@ -100,6 +100,7 @@ export async function processAiJob(db: Db, ai: AIProvider, job: Job, options: { 
 
     // Not a Tech & Innovation product: never published, never re-imported.
     if (def?.requireTechProduct && !en.isTechProduct) {
+      await removeProductImageFiles(db, job.product_id)
       await db.from('products').delete().eq('id', job.product_id)
       await db.from('product_source_metadata').update({ product_id: null, pipeline_status: 'not_eligible', last_error: `Not a Tech & Innovation product: ${en.eligibilityReason}` }).eq('id', meta.id)
       await db.from('translation_jobs').delete().eq('id', job.id)
@@ -150,8 +151,10 @@ export async function processAiJob(db: Db, ai: AIProvider, job: Job, options: { 
         }
       }
 
-      // 4. Images (sources that defer them copy them now).
-      if (def?.deferImages) {
+      // 4. Images: sources that defer them copy them now; any product still
+      // without an image gets another try from the stored source URLs.
+      const { count: before } = await db.from('product_images').select('id', { count: 'exact', head: true }).eq('product_id', job.product_id)
+      if (def && (def.deferImages || !before)) {
         const urls = ((meta.raw_metadata as { imageUrls?: string[] } | null)?.imageUrls ?? []).filter((u) => typeof u === 'string')
         const res = await importCampaignImages(db, def.config, job.product_id, { campaignId: slugify(meta.source_campaign_id).slice(0, 80) || meta.source_campaign_id, imageUrls: urls })
         if (res.errors.length) await logSync(db, { ...log, operation: 'image_import', status: res.imported ? 'warning' : 'error', message: `${res.imported} image(s) imported`, error: res.errors.join('\n') })
