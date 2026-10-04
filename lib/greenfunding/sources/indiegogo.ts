@@ -29,6 +29,12 @@ export type IndiegogoProject = {
   updateCount?: number
 }
 
+// Amount in US dollars (approximate), or null when the currency is unknown.
+export function raisedInUsd(amount: number | null, currency: string | null, rates: Record<string, number>) {
+  if (amount === null || !currency || !rates[currency]) return null
+  return amount * rates[currency]
+}
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : null)
 
@@ -129,8 +135,8 @@ export class IndiegogoApiSource implements CampaignSource {
     }
   }
 
-  // Active projects, newest first, limited to recently started ones (so the
-  // first run doesn't import the whole catalogue) and a minimum of backers.
+  // Active projects, newest first, limited to recently started ones that
+  // have already raised the minimum amount (and have the minimum backers).
   async listNewCampaigns(): Promise<CampaignRef[]> {
     const data = await this.getJson('/api/public/projects/getActiveCrowdfundingProjects')
     if (!Array.isArray(data)) throw new SourceError('Unexpected Indiegogo API response (expected a list).', true)
@@ -141,6 +147,7 @@ export class IndiegogoApiSource implements CampaignSource {
       if (!c) continue
       const start = c.startsAt ? Date.parse(c.startsAt) : 0
       if (start < since || (c.backerCount ?? 0) < this.config.minBackers) continue
+      if (this.config.minRaisedUsd > 0 && (raisedInUsd(c.raisedAmount, c.currency, this.config.usdRates) ?? 0) < this.config.minRaisedUsd) continue
       this.cache.set(c.campaignId, p)
       refs.push({ campaignId: c.campaignId, url: c.url, start })
     }

@@ -3,7 +3,7 @@ import { GeminiProvider } from '@/lib/ai/gemini'
 import { chineseFromEnglish, englishWithinRange, factsFromRegistry } from '@/lib/ai/pipeline'
 import { cleanTags, countWords, hasSimplified, pickCategory, summarySystemPrompt, wordRange } from '@/lib/ai/prompts'
 import { AIError, type AIProvider, type ChineseContent, type EnglishContent, type ProductFacts } from '@/lib/ai/types'
-import { IndiegogoApiSource, normalizeIndiegogoProject, type IndiegogoProject } from '@/lib/greenfunding/sources/indiegogo'
+import { IndiegogoApiSource, normalizeIndiegogoProject, raisedInUsd, type IndiegogoProject } from '@/lib/greenfunding/sources/indiegogo'
 import { sourceDefinition, sourceDefinitions } from '@/lib/greenfunding/sources/registry'
 import { RequestBudgetExceeded, SourceError } from '@/lib/greenfunding/types'
 import { CAMPAIGN_PATHS, normalizeCampaignUrl, validateSourceUrl } from '@/lib/greenfunding/url'
@@ -42,7 +42,7 @@ describe('source registry', () => {
   it('only Indiegogo is limited to tech products, with English source text', () => {
     const igg = sourceDefinitions().find((d) => d.key === 'indiegogo')!
     expect(igg).toMatchObject({ language: 'en', requireTechProduct: true, displayName: 'Indiegogo' })
-    expect(igg.config.syncIntervalMinutes).toBe(60)
+    expect(igg.config.syncIntervalMinutes).toBe(1440)
   })
 })
 
@@ -104,7 +104,7 @@ describe('Indiegogo project normalization', () => {
 })
 
 describe('Indiegogo API source', () => {
-  const config = { ...sourceDefinition('indiegogo')!.config, requestDelayMs: 0, maxRequestsPerRun: 2, lookbackDays: 14, minBackers: 5 }
+  const config = { ...sourceDefinition('indiegogo')!.config, requestDelayMs: 0, maxRequestsPerRun: 2, lookbackDays: 14, minBackers: 5, minRaisedUsd: 0 }
   const ok = (body: unknown) => (async () => new Response(JSON.stringify(body), { status: 200 })) as unknown as typeof fetch
   it('lists recent active projects newest first, filtered by backers, and reuses the list data', async () => {
     const recent = new Date(Date.now() - 2 * 86_400_000).toISOString()
@@ -141,6 +141,17 @@ describe('Indiegogo API source', () => {
     await src.fetchCampaign({ campaignId: 'a', url: '' })
     await src.fetchCampaign({ campaignId: 'b', url: '' })
     await expect(src.fetchCampaign({ campaignId: 'c', url: '' })).rejects.toBeInstanceOf(RequestBudgetExceeded)
+  })
+  it('only lists campaigns that raised the minimum (converted to US dollars)', async () => {
+    const recent = new Date(Date.now() - 86_400_000).toISOString()
+    const p = (id: string, raised: number, currency: string) => project({ projectUrlName: id, projectHomeUrl: `https://www.indiegogo.com/projects/${id}`, campaignStartDate: recent, campaignEndDate: '2099-01-01T00:00:00Z', fundsGathered: raised, currencyShortName: currency })
+    const src = new IndiegogoApiSource({ ...config, minRaisedUsd: 100_000 }, ok([p('usd-big', 150_000, 'USD'), p('usd-small', 99_000, 'USD'), p('hkd-big', 1_000_000, 'HKD'), p('hkd-small', 500_000, 'HKD'), p('odd', 9_999_999, 'XYZ')]))
+    expect((await src.listNewCampaigns()).map((r) => r.campaignId).sort()).toEqual(['hkd-big', 'usd-big'])
+    expect(raisedInUsd(1_000_000, 'HKD', { HKD: 0.128 })).toBeCloseTo(128_000)
+    expect(raisedInUsd(5, 'XYZ', {})).toBeNull()
+  })
+  it('requires US$50,000 raised by default', () => {
+    expect(sourceDefinition('indiegogo')!.config.minRaisedUsd).toBe(50_000)
   })
   it('rejects a response that is not a list', async () => {
     await expect(new IndiegogoApiSource(config, ok({ error: 'x' })).listNewCampaigns()).rejects.toThrow(/expected a list/)

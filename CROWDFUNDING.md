@@ -24,7 +24,11 @@ Visitor ─► Buy now ─► /go/product/<id> ─► 302 to the stored campaign
 | Source | How | Text | Notes |
 | --- | --- | --- | --- |
 | GREEN FUNDING | public pages (`sources/html.ts`) | Japanese | on unless `GREEN_FUNDING_ENABLED=false` |
-| Indiegogo | official public API (`sources/indiegogo.ts`): `/api/public/projects/getActiveCrowdfundingProjects`, `/getCrowdfundingProject?urlName=` | English (short) | off until `INDIEGOGO_ENABLED=true`; needs the AI; tech/innovation only |
+| Indiegogo | official public API (`sources/indiegogo.ts`): `/api/public/projects/getActiveCrowdfundingProjects`, `/getCrowdfundingProject?urlName=` | English (short) | off until `INDIEGOGO_ENABLED=true`; needs the AI; daily; active campaigns started in the last 90 days that already raised ≥ US$50,000 (`INDIEGOGO_MIN_RAISED_USD`); tech/innovation only |
+
+The Indiegogo website (including its search pages) is protected by a
+Cloudflare bot check and is never fetched; ended ("recently funded")
+campaigns are not in the public API, so they are not imported.
 
 Indiegogo's public API gives only a title, a short description (usually under
 100 words), one image and the funding numbers. So Indiegogo summaries are

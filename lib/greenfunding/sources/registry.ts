@@ -18,6 +18,26 @@ export type SourceConfig = GreenFundingConfig & {
   // Indiegogo: only campaigns started within this many days, with this many backers.
   lookbackDays: number
   minBackers: number
+  // Indiegogo: only campaigns that have already raised at least this much
+  // (converted to US dollars with approximate rates; 0 = no minimum).
+  minRaisedUsd: number
+  usdRates: Record<string, number>
+}
+
+// Approximate US-dollar value of one unit of each currency. Only used for
+// the minimum-raised threshold, so rough rates are fine. Override or add
+// with INDIEGOGO_USD_RATES="HKD=0.128,EUR=1.10".
+const DEFAULT_USD_RATES: Record<string, number> = {
+  USD: 1, EUR: 1.1, GBP: 1.3, CAD: 0.73, AUD: 0.66, NZD: 0.6, HKD: 0.128, SGD: 0.77, JPY: 0.0068,
+  CHF: 1.15, SEK: 0.095, DKK: 0.147, NOK: 0.094, MXN: 0.055, KRW: 0.00073, TWD: 0.032, CNY: 0.14,
+}
+const rates = (name: string) => {
+  const out = { ...DEFAULT_USD_RATES }
+  for (const pair of (process.env[name] ?? '').split(',')) {
+    const [code, value] = pair.split('=').map((s) => s.trim())
+    if (/^[A-Z]{3}$/.test(code ?? '') && Number(value) > 0) out[code] = Number(value)
+  }
+  return out
 }
 
 export type SourceDefinition = {
@@ -52,12 +72,14 @@ export function sourceDefinitions(): SourceDefinition[] {
     maxNewPerRun: int('GREEN_FUNDING_MAX_NEW_PER_RUN', 12, 1, 100),
     lookbackDays: 3650,
     minBackers: 0,
+    minRaisedUsd: 0,
+    usdRates: DEFAULT_USD_RATES,
   }
   const igg: SourceConfig = {
     ...base,
     enabled: process.env.INDIEGOGO_ENABLED === 'true',
     baseUrl: (process.env.INDIEGOGO_API_BASE_URL ?? 'https://www.indiegogo.com').replace(/\/$/, ''),
-    syncIntervalMinutes: int('INDIEGOGO_SYNC_INTERVAL_MINUTES', 60, 5, 10080),
+    syncIntervalMinutes: int('INDIEGOGO_SYNC_INTERVAL_MINUTES', 1440, 5, 10080),
     allowedDomains: list('INDIEGOGO_ALLOWED_DOMAINS', ['www.indiegogo.com', 'indiegogo.com']),
     imageDomains: list('INDIEGOGO_IMAGE_DOMAINS', ['cdn.images.indiegogo.com']),
     maxRequestsPerRun: int('INDIEGOGO_MAX_REQUESTS_PER_RUN', 20, 1, 200),
@@ -66,8 +88,10 @@ export function sourceDefinitions(): SourceDefinition[] {
     maxImagesPerProduct: 1,
     excludedCategories: [],
     maxNewPerRun: int('INDIEGOGO_MAX_NEW_PER_RUN', 8, 1, 100),
-    lookbackDays: int('INDIEGOGO_LOOKBACK_DAYS', 14, 1, 365),
+    lookbackDays: int('INDIEGOGO_LOOKBACK_DAYS', 90, 1, 365),
     minBackers: int('INDIEGOGO_MIN_BACKERS', 0, 0, 100000),
+    minRaisedUsd: int('INDIEGOGO_MIN_RAISED_USD', 50000, 0, 1_000_000_000),
+    usdRates: rates('INDIEGOGO_USD_RATES'),
   }
   return [
     { key: 'greenfunding', displayName: 'GREEN FUNDING', language: 'ja', campaignPath: CAMPAIGN_PATHS.greenfunding, deferImages: false, requireTechProduct: false, config: gf, create: () => new HtmlCampaignSource(gf) },
