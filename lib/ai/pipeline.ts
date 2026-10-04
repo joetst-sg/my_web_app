@@ -184,6 +184,11 @@ export async function processAiJob(db: Db, ai: AIProvider, job: Job, options: { 
       await logSync(db, { ...log, status: 'warning', message: 'AI quota reached; will try again in about an hour', error: message, durationMs: Date.now() - started })
       return 'quota' as const
     }
+    if (e instanceof AIError && e.busy) {
+      await db.from('translation_jobs').update({ status: 'queued', last_error: `AI busy: ${message}`.slice(0, 2000), run_after: new Date(Date.now() + 15 * 60_000).toISOString() }).eq('id', job.id)
+      await logSync(db, { ...log, status: 'warning', message: 'AI temporarily busy; will try again in about 15 minutes', error: message, durationMs: Date.now() - started })
+      return 'quota' as const
+    }
     const attempts = job.attempts + 1
     const retryable = !(e instanceof AIError) || e.retryable
     const next = nextAttempt(attempts, job.max_attempts, retryable)

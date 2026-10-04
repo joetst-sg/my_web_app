@@ -50,8 +50,10 @@ export class GeminiProvider implements AIProvider {
       const status = body?.error?.status ?? ''
       // Quotas/rate limits clear by themselves; a bad key or model name doesn't.
       const quota = res.status === 429 || status === 'RESOURCE_EXHAUSTED'
-      const retryable = quota || res.status >= 500
-      throw new AIError(`Gemini ${res.status}${status ? ` (${status})` : ''}: ${body?.error?.message ?? 'request failed'}`.slice(0, 500), retryable, quota)
+      // "High demand" (503 UNAVAILABLE) is common on the free tier and passes by itself.
+      const busy = res.status === 503 || status === 'UNAVAILABLE'
+      const retryable = quota || busy || res.status >= 500
+      throw new AIError(`Gemini ${res.status}${status ? ` (${status})` : ''}: ${body?.error?.message ?? 'request failed'}`.slice(0, 500), retryable, quota, busy)
     }
     const data = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[]; promptFeedback?: { blockReason?: string } }
     if (data.promptFeedback?.blockReason) throw new AIError(`Gemini blocked the request (${data.promptFeedback.blockReason}).`, false)
