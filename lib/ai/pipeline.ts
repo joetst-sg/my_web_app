@@ -136,7 +136,8 @@ export async function processAiJob(db: Db, ai: AIProvider, job: Job, options: { 
     if (applied) {
       const translations = { ...((product.translations as Record<string, unknown>) ?? {}), 'zh-HK': { name: zh.title, tagline: zh.shortDescription, description: zh.description, seo_title: zh.seoTitle, seo_description: zh.seoDescription } }
       const slug = product.slug === placeholderSlug(meta.source, meta.source_campaign_id)
-        ? await uniqueSlug(db, `${slugify(en.title).slice(0, 70) || 'product'}-${slugify(meta.source_campaign_id).slice(0, 20)}`.replace(/-+$/, ''), job.product_id)
+        // Numeric campaign ids (GREEN FUNDING) are appended; word ids (Indiegogo) would repeat the title.
+        ? await uniqueSlug(db, `${slugify(en.title).slice(0, 70) || 'product'}${/^\d+$/.test(meta.source_campaign_id) ? `-${meta.source_campaign_id}` : ''}`.replace(/-+$/, ''), job.product_id)
         : product.slug
       await db.from('products').update({ name: en.title, tagline: en.shortDescription, description: en.description, seo_title: en.seoTitle, seo_description: en.seoDescription, translations: translations as never, slug }).eq('id', job.product_id)
       if (en.tags.length) await setTags(db, job.product_id, en.tags)
