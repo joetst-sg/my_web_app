@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { tidyStructure } from '@/lib/text-structure'
 
 // Renders product descriptions written as plain text with light markdown:
 // "### heading", "**bold**", "• " or "- " bullet lines, blank lines between
@@ -10,7 +11,7 @@ function inline(text: string) {
 }
 
 export function RichText({ text, className }: { text: string; className?: string }) {
-  const blocks = text.replace(/\r\n/g, '\n').split(/\n{2,}/).map((b) => b.trim()).filter(Boolean)
+  const blocks = tidyStructure(text).split(/\n{2,}/).map((b) => b.trim()).filter(Boolean)
   return (
     <div className={className}>
       {blocks.map((block, i) => {

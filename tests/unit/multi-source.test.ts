@@ -367,3 +367,17 @@ describe('amount raised instead of price', () => {
     expect(raisedOf({ source_name: null, campaign_raised: null, campaign_currency: null })).toBeNull()
   })
 })
+
+describe('description structure', () => {
+  it('puts a run-in heading and bullets on their own lines', async () => {
+    const { tidyStructure } = await import('@/lib/text-structure')
+    const raw = 'Compact and easy to use. ### Key features • Remote grading over Wi-Fi • Reports in 15 minutes'
+    expect(tidyStructure(raw)).toBe('Compact and easy to use.\n\n### Key features\n\n• Remote grading over Wi-Fi\n• Reports in 15 minutes')
+  })
+  it('leaves well-formed text and Japanese middle dots alone', async () => {
+    const { tidyStructure } = await import('@/lib/text-structure')
+    const ok = 'Intro paragraph.\n\n### Key features\n\n• One\n• Two'
+    expect(tidyStructure(ok)).toBe(ok)
+    expect(tidyStructure('ガジェット・アクセサリ C# code')).toBe('ガジェット・アクセサリ C# code')
+  })
+})

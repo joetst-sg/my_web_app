@@ -16,7 +16,7 @@ Rules:
 - Do not copy the source text word-for-word; rewrite it in your own words. If the source is Japanese, write in English.
 - Avoid hype and superlatives such as "the world's best", "revolutionary" or "guaranteed" unless the source states them as a verifiable fact (then attribute them, e.g. "the maker says").
 - Keep brand names, product names, model numbers, technical standards and units exactly as in the source.
-- Write natural English for an international technology audience. Plain paragraphs; you may use one short "### Key features" heading followed by lines starting with "• ".
+- Write natural English for an international technology audience. Plain paragraphs separated by a blank line; you may add one short "### Key features" heading on its own line, followed by a blank line and one feature per line, each line starting with "• ". Use real line breaks (\n) in the JSON string.
 - description must be ${o.minWords}–${o.maxWords} words.${o.feedback ? `\n- ${o.feedback}` : ''}
 
 Other fields:

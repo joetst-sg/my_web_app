@@ -1,3 +1,4 @@
+import { tidyStructure } from '@/lib/text-structure'
 import { clip, cleanTags, LIMITS, pickCategory, SEO_SYSTEM, summarySystemPrompt, summaryUserPrompt, TAGS_SYSTEM, TRANSLATION_SYSTEM, translationUserPrompt } from './prompts'
 import { AIError, type AIProvider, type ChineseContent, type EnglishContent, type ProductFacts, type SeoContent, type SummaryOptions } from './types'
 
@@ -76,7 +77,7 @@ export class GeminiProvider implements AIProvider {
       eligibilityReason: clip(str('eligibility_reason'), 300),
       title: clip(str('title'), LIMITS.title),
       shortDescription: clip(str('short_description') || str('title'), LIMITS.shortDescription),
-      description: clip(str('description'), LIMITS.description),
+      description: clip(tidyStructure(str('description')), LIMITS.description),
       seoTitle: clip(str('seo_title') || str('title'), LIMITS.seoTitle),
       seoDescription: clip(str('seo_description') || str('short_description'), LIMITS.seoDescription),
       category: pickCategory(r.category, options.categories),
@@ -92,7 +93,7 @@ export class GeminiProvider implements AIProvider {
     return {
       title: clip(str('title'), LIMITS.title),
       shortDescription: clip(str('short_description') || str('title'), LIMITS.shortDescription),
-      description: clip(str('description'), LIMITS.description),
+      description: clip(tidyStructure(str('description')), LIMITS.description),
       seoTitle: clip(str('seo_title') || str('title'), LIMITS.seoTitle),
       seoDescription: clip(str('seo_description') || str('short_description'), LIMITS.seoDescription),
       imageAlt: clip(str('image_alt') || str('title'), LIMITS.imageAlt),
